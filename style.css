@@ -130,6 +130,47 @@ body {
   padding-left: 8px;
 }
 
+/* Indicatore Stato Database */
+.db-status-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.db-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.db-status-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.db-status-dot.offline {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.db-status-dot.connecting {
+  background-color: #f59e0b;
+  animation: pulse-status 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-status {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; box-shadow: 0 0 8px #f59e0b; }
+}
+
 .brand-icon {
   background: var(--accent-gradient);
   color: #fff;
@@ -1013,6 +1054,10 @@ body {
 
   .brand {
     margin-bottom: 0;
+  }
+
+  .db-status-container {
+    display: none !important;
   }
 
   .sidebar-nav {

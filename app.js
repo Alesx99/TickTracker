@@ -23,6 +23,25 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketToDeleteId = null;
   let chartUpdateTimeout = null;
 
+  // Funzione per aggiornare graficamente lo stato di connessione al database
+  function updateDbStatus(status) {
+    const dot = document.getElementById('db-status-dot');
+    const text = document.getElementById('db-status-text');
+    if (!dot || !text) return;
+
+    dot.className = 'db-status-dot';
+    if (status === 'online') {
+      dot.classList.add('online');
+      text.textContent = 'Cloud Sync Attivo';
+    } else if (status === 'offline') {
+      dot.classList.add('offline');
+      text.textContent = 'Modalità Locale (Offline)';
+    } else {
+      dot.classList.add('connecting');
+      text.textContent = 'Verifica connessione...';
+    }
+  }
+
 
 
   // ==========================================================================
@@ -57,12 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadData() {
     try {
       showLoadingState();
+      updateDbStatus('connecting');
       const response = await fetch(`${API_URL}/api/tickets`);
       if (!response.ok) throw new Error('Impossibile connettersi all\'API backend');
       const data = await response.json();
       tickets = Array.isArray(data) ? data : [];
+      updateDbStatus('online');
     } catch (e) {
       console.error('Errore nel recupero dati, uso localStorage come fallback:', e);
+      updateDbStatus('offline');
       const savedTickets = localStorage.getItem('bettracker_tickets');
       if (savedTickets) {
         try {
@@ -85,14 +107,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadAgencies() {
     try {
+      updateDbStatus('connecting');
       const response = await fetch(`${API_URL}/api/agencies`);
       if (!response.ok) throw new Error('Impossibile caricare le agenzie dal database cloud');
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
         agenciesList = data;
       }
+      updateDbStatus('online');
     } catch (e) {
       console.warn('Errore nel recupero agenzie, uso localStorage come fallback:', e);
+      updateDbStatus('offline');
       const savedAgencies = localStorage.getItem('bettracker_agencies');
       if (savedAgencies) {
         try {
@@ -114,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function addAgency(name) {
     const payload = { name };
     try {
+      updateDbStatus('connecting');
       const response = await fetch(`${API_URL}/api/agencies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,8 +149,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const created = await response.json();
       agenciesList.push(created);
       saveAgenciesLocal();
+      updateDbStatus('online');
     } catch (err) {
       console.error('Errore nel salvataggio agenzia sul cloud, fallback locale:', err);
+      updateDbStatus('offline');
       const localAgency = {
         id: 'local-' + Date.now(),
         name,
@@ -139,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function deleteAgency(id, name) {
     try {
       if (id && !id.startsWith('local-') && !id.startsWith('default-')) {
+        updateDbStatus('connecting');
         const response = await fetch(`${API_URL}/api/agencies/${id}`, {
           method: 'DELETE'
         });
@@ -147,8 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       agenciesList = agenciesList.filter(a => a.id !== id);
       saveAgenciesLocal();
+      updateDbStatus('online');
     } catch (err) {
       console.error('Errore nella cancellazione dell\'agenzia sul cloud, fallback locale:', err);
+      updateDbStatus('offline');
       agenciesList = agenciesList.filter(a => a.id !== id);
       saveAgenciesLocal();
       alert('Impossibile cancellare l\'agenzia sul cloud. Rimossa solo in locale.');
@@ -196,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm(`Sei sicuro di voler importare ${importedData.length} ticket? Il database corrente verrà sovrascritto.`)) {
               try {
                 showLoadingState();
+                updateDbStatus('connecting');
                 // 1. Resetta database cloud
                 await fetch(`${API_URL}/api/tickets-all/reset`, { method: 'DELETE' });
                 // 2. Inserisci in blocco
@@ -207,9 +239,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error('Ripristino bulk fallito');
                 tickets = await response.json();
                 saveDataLocal();
+                updateDbStatus('online');
                 alert('Backup ripristinato sul database cloud con successo!');
               } catch (err) {
                 console.error('Errore nel ripristino cloud, eseguo fallback locale:', err);
+                updateDbStatus('offline');
                 tickets = importedData;
                 saveDataLocal();
                 alert('Errore di connessione al server. I dati sono stati caricati temporaneamente solo in locale.');
@@ -304,6 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       showLoadingState();
+      updateDbStatus('connecting');
       // 1. Resetta il database cloud
       await fetch(`${API_URL}/api/tickets-all/reset`, { method: 'DELETE' });
       // 2. Inserisci in blocco nel database cloud
@@ -316,9 +351,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
       tickets = Array.isArray(data) ? data : demoTickets;
       saveDataLocal();
+      updateDbStatus('online');
       if (notifyUser) alert('Dati demo generati e salvati sul database cloud con successo!');
     } catch (err) {
       console.error('Errore durante la generazione dei dati demo cloud:', err);
+      updateDbStatus('offline');
       // Fallback locale in caso di errore
       tickets = demoTickets.map((t, idx) => ({ ...t, id: 'local-demo-' + idx }));
       saveDataLocal();
@@ -842,6 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       showLoadingState();
+      updateDbStatus('connecting');
       if (id) {
         // Modalità Modifica
         // Se è un ticket creato solo in locale (offline fallback), lo creiamo come nuovo sul server
@@ -881,9 +919,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       saveDataLocal();
+      updateDbStatus('online');
       closeDialog(ticketModal);
     } catch (err) {
       console.error('Errore durante il salvataggio cloud, eseguo fallback locale:', err);
+      updateDbStatus('offline');
       alert('Impossibile salvare sul database cloud. Il ticket è stato salvato temporaneamente in locale.');
       
       if (id) {
@@ -935,6 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ticketToDeleteId) {
       try {
         showLoadingState();
+        updateDbStatus('connecting');
         // Se si tratta di un ticket locale (es. offline) lo rimuoviamo solo localmente
         if (!ticketToDeleteId.startsWith('local-')) {
           const response = await fetch(`${API_URL}/api/tickets/${ticketToDeleteId}`, {
@@ -944,8 +985,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tickets = tickets.filter(t => t.id !== ticketToDeleteId);
         saveDataLocal();
+        updateDbStatus('online');
       } catch (err) {
         console.error('Errore durante la cancellazione cloud, eseguo fallback locale:', err);
+        updateDbStatus('offline');
         alert('Impossibile eliminare dal database cloud. Il ticket è stato rimosso solo localmente.');
         tickets = tickets.filter(t => t.id !== ticketToDeleteId);
         saveDataLocal();
@@ -1467,12 +1510,8 @@ document.addEventListener('DOMContentLoaded', () => {
     await loadAgencies();
     await loadData();
     
-    // Se l'elenco è vuoto sia nel database che in locale, genera dati demo
-    if (tickets.length === 0) {
-      await generateDemoData(false);
-    } else {
-      renderApp();
-    }
+    // Renderizza l'app con i dati caricati (se vuoto, mostrerà lo stato vuoto)
+    renderApp();
 
     // Inizializza le icone Lucide
     if (typeof lucide !== 'undefined') {

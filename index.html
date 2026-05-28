@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Foglio di Stile Personalizzato -->
-  <link rel="stylesheet" href="style.css?v=1.0.5">
+  <link rel="stylesheet" href="style.css?v=1.0.6">
   
   <!-- Librerie CDN -->
   <!-- Chart.js per i Grafici -->
@@ -33,6 +33,12 @@
           <i data-lucide="trending-up"></i>
         </div>
         <span class="brand-name">BetTracker <span class="brand-tag">PRO</span></span>
+      </div>
+      
+      <!-- Indicatore Stato Database Cloud -->
+      <div class="db-status-container">
+        <span class="db-status-dot connecting" id="db-status-dot"></span>
+        <span class="db-status-text" id="db-status-text">Verifica connessione...</span>
       </div>
       
       <nav class="sidebar-nav">
@@ -473,6 +479,6 @@
   </dialog>
 
   <!-- Script Logico principale dell'applicazione -->
-  <script src="app.js?v=1.0.5"></script>
+  <script src="app.js?v=1.0.6"></script>
 </body>
 </html>
