@@ -51,19 +51,23 @@ document.addEventListener('DOMContentLoaded', () => {
       showLoadingState();
       const response = await fetch(`${API_URL}/api/tickets`);
       if (!response.ok) throw new Error('Impossibile connettersi all\'API backend');
-      tickets = await response.json();
+      const data = await response.json();
+      tickets = Array.isArray(data) ? data : [];
     } catch (e) {
       console.error('Errore nel recupero dati, uso localStorage come fallback:', e);
       const savedTickets = localStorage.getItem('bettracker_tickets');
       if (savedTickets) {
         try {
-          tickets = JSON.parse(savedTickets);
+          const parsed = JSON.parse(savedTickets);
+          tickets = Array.isArray(parsed) ? parsed : [];
         } catch (err) {
           tickets = [];
         }
+      } else {
+        tickets = [];
       }
     } finally {
-      renderApp();
+      // Rimosso renderApp() da qui per evitare render concorrenti all'avvio
     }
   }
 
@@ -229,7 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(demoTickets)
       });
       if (!response.ok) throw new Error('Inserimento bulk fallito');
-      tickets = await response.json();
+      const data = await response.json();
+      tickets = Array.isArray(data) ? data : demoTickets;
       saveDataLocal();
       if (notifyUser) alert('Dati demo generati e salvati sul database cloud con successo!');
     } catch (err) {
@@ -391,10 +396,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Popola la select delle agenzie dinamicamente in base ai ticket salvati
   function updateAgencyFilterOptions() {
+    if (!filterAgency) return;
     const currentSelected = filterAgency.value;
     
-    // Trova tutte le agenzie univoche
-    const uniqueAgencies = [...new Set(tickets.map(t => t.agency))].sort();
+    // Trova tutte le agenzie univoche (escludendo valori falsy)
+    const uniqueAgencies = [...new Set(tickets.map(t => t.agency).filter(Boolean))].sort();
     
     // Costruisci le opzioni
     filterAgency.innerHTML = '<option value="all">Tutte le agenzie</option>';
@@ -408,12 +414,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Aggiorna anche il datalist nel form modale
     const datalist = document.getElementById('datalist-agencies');
-    datalist.innerHTML = '';
-    uniqueAgencies.forEach(agency => {
-      const option = document.createElement('option');
-      option.value = agency;
-      datalist.appendChild(option);
-    });
+    if (datalist) {
+      datalist.innerHTML = '';
+      uniqueAgencies.forEach(agency => {
+        const option = document.createElement('option');
+        option.value = agency;
+        datalist.appendChild(option);
+      });
+    }
   }
 
   // ==========================================================================
@@ -433,14 +441,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let openPotentialWinnings = 0;
     
     filtered.forEach(t => {
-      totalPlayed += t.amountPlayed;
+      const amountPlayed = parseFloat(t.amountPlayed) || 0;
+      const actualWinnings = parseFloat(t.actualWinnings) || 0;
+      const odds = parseFloat(t.odds) || 0;
+      
+      totalPlayed += amountPlayed;
       if (t.status === 'vinto') {
-        totalWon += t.actualWinnings;
+        totalWon += actualWinnings;
       } else if (t.status === 'perso') {
-        totalLost += t.amountPlayed;
+        totalLost += amountPlayed;
       } else if (t.status === 'aperto') {
         openCount++;
-        openPotentialWinnings += (t.amountPlayed * t.odds);
+        openPotentialWinnings += (amountPlayed * odds);
       }
     });
     
@@ -494,11 +506,11 @@ document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
     }
   }
-
+ 
   function formatEuro(amount) {
     return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount);
   }
-
+ 
   function renderTable(filteredTickets) {
     const tbody = document.getElementById('tickets-table-body');
     tbody.innerHTML = '';
@@ -515,7 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Ordina i ticket per data di emissione decrescente (più recenti in alto)
-    const sorted = [...filteredTickets].sort((a, b) => b.emissionDate.localeCompare(a.emissionDate));
+    const sorted = [...filteredTickets].sort((a, b) => (b.emissionDate || '').localeCompare(a.emissionDate || ''));
     
     sorted.forEach(t => {
       const tr = document.createElement('tr');
@@ -530,14 +542,18 @@ document.addEventListener('DOMContentLoaded', () => {
       let winningsDisplay = '-';
       let winningsClass = 'text-muted';
       
+      const amountPlayed = parseFloat(t.amountPlayed) || 0;
+      const odds = parseFloat(t.odds) || 0;
+      const actualWinnings = parseFloat(t.actualWinnings) || 0;
+      
       if (t.status === 'vinto') {
-        winningsDisplay = formatEuro(t.actualWinnings);
+        winningsDisplay = formatEuro(actualWinnings);
         winningsClass = 'text-green cell-currency';
       } else if (t.status === 'perso') {
         winningsDisplay = formatEuro(0);
         winningsClass = 'text-red';
       } else {
-        winningsDisplay = `Potenziale: ${formatEuro(t.amountPlayed * t.odds)}`;
+        winningsDisplay = `Potenziale: ${formatEuro(amountPlayed * odds)}`;
         winningsClass = 'text-amber';
       }
       
@@ -546,8 +562,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${escapeHtml(t.event)}</td>
         <td><span class="badge">${escapeHtml(t.outcomePlayed)}</span></td>
         <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
-        <td>${t.odds.toFixed(2)}</td>
-        <td class="cell-currency">${formatEuro(t.amountPlayed)}</td>
+        <td>${odds.toFixed(2)}</td>
+        <td class="cell-currency">${formatEuro(amountPlayed)}</td>
         <td class="${winningsClass}">${winningsDisplay}</td>
         <td>${formatDateString(t.emissionDate)}</td>
         <td>${formatDateString(t.competenceDate)}</td>
@@ -589,6 +605,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function escapeHtml(text) {
+    if (text === undefined || text === null) return '';
+    const textStr = String(text);
     const map = {
       '&': '&amp;',
       '<': '&lt;',
@@ -596,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '"': '&quot;',
       "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return textStr.replace(/[&<>"']/g, m => map[m]);
   }
 
   // ==========================================================================
@@ -1214,36 +1232,46 @@ document.addEventListener('DOMContentLoaded', () => {
       const activeNav = document.getElementById('nav-analytics');
       if (activeNav) activeNav.classList.add('active');
       dashboardGrid.classList.add('show-only-analytics');
+      // Forza il ridisegno dei grafici per adattarli allo spazio visibile
+      updateCharts(getFilteredTickets());
     } else {
       // Default: Dashboard (mostra entrambi)
       const activeNav = document.getElementById('nav-dashboard');
       if (activeNav) activeNav.classList.add('active');
+      // Forza il ridisegno dei grafici per adattarli allo spazio visibile
+      updateCharts(getFilteredTickets());
     }
   }
 
   window.addEventListener('hashchange', handleNavigation);
-  handleNavigation(); // Esegui anche all'avvio caricando il tab corretto se presente nell'URL
 
   // ==========================================================================
-  // 11. INIZIALIZZAZIONE AVVIO (Eseguita alla fine dopo tutte le dichiarazioni)
+  // 11. INIZIALIZZAZIONE AVVIO (Eseguita in modo sequenziale)
   // ==========================================================================
-  
-  // Carica i dati all'avvio
-  loadData();
+  async function initApp() {
+    // Inizializza la configurazione iniziale dei grafici
+    initCharts();
+    
+    // Rileva hash iniziale e imposta classi/stati di navigazione corretti
+    handleNavigation();
+    
+    // Carica dati dal database cloud o fallback locale
+    await loadData();
+    
+    // Se l'elenco è vuoto sia nel database che in locale, genera dati demo
+    if (tickets.length === 0) {
+      await generateDemoData(false);
+    } else {
+      renderApp();
+    }
 
-  // Se non ci sono dati, genera dati demo per mostrare l'applicazione in azione
-  if (tickets.length === 0) {
-    generateDemoData(false); // Genera in modo silente all'avvio
+    // Inizializza le icone Lucide
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    } else {
+      console.warn('Libreria Lucide non caricata. Le icone potrebbero non essere visualizzate.');
+    }
   }
 
-  // Inizializza le icone Lucide
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  } else {
-    console.warn('Libreria Lucide non caricata. Le icone potrebbero non essere visualizzate.');
-  }
-
-  // Inizializza i grafici ed esegui il primo render dell'app
-  initCharts();
-  renderApp();
+  initApp();
 });
