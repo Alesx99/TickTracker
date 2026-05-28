@@ -24,7 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Inizializza le icone Lucide
-  lucide.createIcons();
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  } else {
+    console.warn('Libreria Lucide non caricata. Le icone potrebbero non essere visualizzate.');
+  }
 
   // Inizializza i grafici ed esegui il primo render dell'app
   initCharts();
@@ -503,7 +507,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCharts(filtered);
     
     // Aggiorna le icone Lucide create dinamicamente
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
   }
 
   function formatEuro(amount) {
@@ -913,6 +919,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // 9. FUNZIONALITÀ GRAFICI CON CHART.JS
   // ==========================================================================
   function initCharts() {
+    if (typeof Chart === 'undefined') {
+      console.warn('Libreria Chart.js non caricata. I grafici saranno disabilitati.');
+      return;
+    }
     // Configurazione dei font Chart.js per coordinamento estetico
     Chart.defaults.font.family = varCss('--font-main');
     Chart.defaults.color = varCss('--text-secondary');
@@ -924,6 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateCharts(filteredTickets) {
+    if (typeof Chart === 'undefined') return;
     // 1. GRAFICO PROFITTO NETTO SETTIMANALE
     // Raggruppa i ticket per settimana basandoci sulla data di emissione
     const weeklyData = {};
