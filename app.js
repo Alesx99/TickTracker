@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // URL del Backend (su localhost o Render)
   const API_URL = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
     ? 'http://localhost:3000'
-    : 'https://ticktracker-backend.onrender.com'; // Sostituire con l'URL del tuo Web Service su Render
+    : 'https://ticktracker.onrender.com';
 
   function showLoadingState() {
     const tbody = document.getElementById('tickets-table-body');
