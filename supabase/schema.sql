@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.tickets (
 ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
 
 -- Creazione policy permissiva per lo sviluppo (consente lettura/scrittura con anon key)
+DROP POLICY IF EXISTS "Consenti accesso completo a tutti con anon key" ON public.tickets;
 CREATE POLICY "Consenti accesso completo a tutti con anon key" 
 ON public.tickets 
 FOR ALL 
@@ -51,6 +52,7 @@ CREATE TABLE IF NOT EXISTS public.agencies (
 ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
 
 -- Creazione policy permissiva per lo sviluppo su agencies
+DROP POLICY IF EXISTS "Consenti accesso completo a tutti con anon key su agencies" ON public.agencies;
 CREATE POLICY "Consenti accesso completo a tutti con anon key su agencies" 
 ON public.agencies 
 FOR ALL 
