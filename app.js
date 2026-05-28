@@ -15,24 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   let ticketToDeleteId = null;
 
-  // Carica i dati all'avvio
-  loadData();
 
-  // Se non ci sono dati, genera dati demo per mostrare l'applicazione in azione
-  if (tickets.length === 0) {
-    generateDemoData(false); // Genera in modo silente all'avvio
-  }
-
-  // Inizializza le icone Lucide
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  } else {
-    console.warn('Libreria Lucide non caricata. Le icone potrebbero non essere visualizzate.');
-  }
-
-  // Inizializza i grafici ed esegui il primo render dell'app
-  initCharts();
-  renderApp();
 
   // ==========================================================================
   // 2. FUNZIONI DI PERSISTENZA, CARICAMENTO E BACKUP
@@ -1207,4 +1190,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Avvia il download del file Excel
     XLSX.writeFile(wb, fileName);
   });
+
+  // ==========================================================================
+  // 11. INIZIALIZZAZIONE AVVIO (Eseguita alla fine dopo tutte le dichiarazioni)
+  // ==========================================================================
+  
+  // Carica i dati all'avvio
+  loadData();
+
+  // Se non ci sono dati, genera dati demo per mostrare l'applicazione in azione
+  if (tickets.length === 0) {
+    generateDemoData(false); // Genera in modo silente all'avvio
+  }
+
+  // Inizializza le icone Lucide
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  } else {
+    console.warn('Libreria Lucide non caricata. Le icone potrebbero non essere visualizzate.');
+  }
+
+  // Inizializza i grafici ed esegui il primo render dell'app
+  initCharts();
+  renderApp();
 });
