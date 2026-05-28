@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     agencyVolume: null
   };
   let ticketToDeleteId = null;
+  let chartUpdateTimeout = null;
 
 
 
@@ -1015,146 +1016,159 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateCharts(filteredTickets) {
     if (typeof Chart === 'undefined') return;
-    // 1. GRAFICO PROFITTO NETTO SETTIMANALE
-    // Raggruppa i ticket per settimana basandoci sulla data di emissione
-    const weeklyData = {};
-    
-    // Ordiniamo tutti i ticket storici per data per visualizzare un asse temporale corretto
-    const allSortedTickets = [...tickets].sort((a, b) => a.emissionDate.localeCompare(b.emissionDate));
-    
-    allSortedTickets.forEach(t => {
-      // Consideriamo solo i ticket conclusi (Vinto o Perso) per calcolare il profitto effettivo
-      if (t.status === 'aperto') return; 
-      
-      const weekLabel = getWeekLabel(t.emissionDate);
-      if (!weeklyData[weekLabel]) {
-        weeklyData[weekLabel] = 0;
-      }
-      
-      if (t.status === 'vinto') {
-        weeklyData[weekLabel] += (t.actualWinnings - t.amountPlayed);
-      } else {
-        weeklyData[weekLabel] -= t.amountPlayed;
-      }
-    });
 
-    const labelsNetProfit = Object.keys(weeklyData);
-    const dataNetProfit = Object.values(weeklyData);
+    if (chartUpdateTimeout) {
+      clearTimeout(chartUpdateTimeout);
+    }
 
-    const ctxProfit = document.getElementById('chart-net-profit').getContext('2d');
-    if (charts.netProfit) charts.netProfit.destroy();
-    
-    charts.netProfit = new Chart(ctxProfit, {
-      type: 'line',
-      data: {
-        labels: labelsNetProfit,
-        datasets: [{
-          label: 'Profitto (€)',
-          data: dataNetProfit,
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-          fill: true,
-          tension: 0.35,
-          borderWidth: 3,
-          pointBackgroundColor: '#8b5cf6',
-          pointBorderColor: '#fff',
-          pointHoverRadius: 7
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                let label = context.dataset.label || '';
-                if (label) label += ': ';
-                if (context.parsed.y !== null) {
-                  label += new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(context.parsed.y);
+    chartUpdateTimeout = setTimeout(() => {
+      const canvasProfit = document.getElementById('chart-net-profit');
+      const canvasAgency = document.getElementById('chart-agency-volume');
+      if (!canvasProfit || !canvasAgency) return;
+
+      const ctxProfit = canvasProfit.getContext('2d');
+      const ctxAgency = canvasAgency.getContext('2d');
+      if (!ctxProfit || !ctxAgency) return;
+
+      // 1. GRAFICO PROFITTO NETTO SETTIMANALE
+      // Raggruppa i ticket per settimana basandoci sulla data di emissione
+      const weeklyData = {};
+      
+      // Ordiniamo tutti i ticket storici per data per visualizzare un asse temporale corretto
+      const allSortedTickets = [...tickets].sort((a, b) => a.emissionDate.localeCompare(b.emissionDate));
+      
+      allSortedTickets.forEach(t => {
+        // Consideriamo solo i ticket conclusi (Vinto o Perso) per calcolare il profitto effettivo
+        if (t.status === 'aperto') return; 
+        
+        const weekLabel = getWeekLabel(t.emissionDate);
+        if (!weeklyData[weekLabel]) {
+          weeklyData[weekLabel] = 0;
+        }
+        
+        if (t.status === 'vinto') {
+          weeklyData[weekLabel] += (t.actualWinnings - t.amountPlayed);
+        } else {
+          weeklyData[weekLabel] -= t.amountPlayed;
+        }
+      });
+
+      const labelsNetProfit = Object.keys(weeklyData);
+      const dataNetProfit = Object.values(weeklyData);
+
+      if (charts.netProfit) charts.netProfit.destroy();
+      
+      charts.netProfit = new Chart(ctxProfit, {
+        type: 'line',
+        data: {
+          labels: labelsNetProfit,
+          datasets: [{
+            label: 'Profitto (€)',
+            data: dataNetProfit,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 3,
+            pointBackgroundColor: '#8b5cf6',
+            pointBorderColor: '#fff',
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) label += ': ';
+                  if (context.parsed.y !== null) {
+                    label += new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(context.parsed.y);
+                  }
+                  return label;
                 }
-                return label;
               }
             }
-          }
-        },
-        scales: {
-          y: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: {
-              callback: function(value) { return '€' + value; }
-            }
           },
-          x: { grid: { display: false } }
+          scales: {
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: {
+                callback: function(value) { return '€' + value; }
+              }
+            },
+            x: { grid: { display: false } }
+          }
         }
-      }
-    });
+      });
 
-    // 2. GRAFICO VOLUME GIOCATO PER AGENZIA
-    const agencyData = {};
-    filteredTickets.forEach(t => {
-      if (!agencyData[t.agency]) {
-        agencyData[t.agency] = 0;
-      }
-      agencyData[t.agency] += t.amountPlayed;
-    });
+      // 2. GRAFICO VOLUME GIOCATO PER AGENZIA
+      const agencyData = {};
+      filteredTickets.forEach(t => {
+        if (!agencyData[t.agency]) {
+          agencyData[t.agency] = 0;
+        }
+        agencyData[t.agency] += t.amountPlayed;
+      });
 
-    const labelsAgency = Object.keys(agencyData);
-    const dataAgency = Object.values(agencyData);
+      const labelsAgency = Object.keys(agencyData);
+      const dataAgency = Object.values(agencyData);
 
-    const ctxAgency = document.getElementById('chart-agency-volume').getContext('2d');
-    if (charts.agencyVolume) charts.agencyVolume.destroy();
+      if (charts.agencyVolume) charts.agencyVolume.destroy();
 
-    // Palette sfumata per le agenzie
-    const bgColors = labelsAgency.map((_, i) => {
-      const hues = [250, 270, 190, 150, 340];
-      const hue = hues[i % hues.length];
-      return `hsla(${hue}, 70%, 60%, 0.6)`;
-    });
-    const borderColors = labelsAgency.map((_, i) => {
-      const hues = [250, 270, 190, 150, 340];
-      const hue = hues[i % hues.length];
-      return `hsla(${hue}, 70%, 60%, 1)`;
-    });
+      // Palette sfumata per le agenzie
+      const bgColors = labelsAgency.map((_, i) => {
+        const hues = [250, 270, 190, 150, 340];
+        const hue = hues[i % hues.length];
+        return `hsla(${hue}, 70%, 60%, 0.6)`;
+      });
+      const borderColors = labelsAgency.map((_, i) => {
+        const hues = [250, 270, 190, 150, 340];
+        const hue = hues[i % hues.length];
+        return `hsla(${hue}, 70%, 60%, 1)`;
+      });
 
-    charts.agencyVolume = new Chart(ctxAgency, {
-      type: 'bar',
-      data: {
-        labels: labelsAgency,
-        datasets: [{
-          label: 'Giocato (€)',
-          data: dataAgency,
-          backgroundColor: bgColors,
-          borderColor: borderColors,
-          borderWidth: 1.5,
-          borderRadius: 6
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                return ' Giocato: ' + new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(context.parsed.y);
+      charts.agencyVolume = new Chart(ctxAgency, {
+        type: 'bar',
+        data: {
+          labels: labelsAgency,
+          datasets: [{
+            label: 'Giocato (€)',
+            data: dataAgency,
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return ' Giocato: ' + new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(context.parsed.y);
+                }
               }
             }
-          }
-        },
-        scales: {
-          y: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: {
-              callback: function(value) { return '€' + value; }
-            }
           },
-          x: { grid: { display: false } }
+          scales: {
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: {
+                callback: function(value) { return '€' + value; }
+              }
+            },
+            x: { grid: { display: false } }
+          }
         }
-      }
-    });
+      });
+    }, 100);
   }
 
   // ==========================================================================
