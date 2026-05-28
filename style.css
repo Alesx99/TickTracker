@@ -942,6 +942,21 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* Stili di Navigazione Tab / Pagine */
+.dashboard-grid.show-only-tickets {
+  grid-template-columns: 1fr !important;
+}
+.dashboard-grid.show-only-tickets #section-analytics {
+  display: none !important;
+}
+
+.dashboard-grid.show-only-analytics {
+  grid-template-columns: 1fr !important;
+}
+.dashboard-grid.show-only-analytics #section-tickets {
+  display: none !important;
+}
+
 /* 9. RESPONSIVE DESIGN (MEDIA QUERIES) */
 @media (max-width: 1200px) {
   .dashboard-grid {

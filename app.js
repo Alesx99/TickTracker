@@ -1192,6 +1192,39 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================================================
+  // 10. GESTIONE NAVIGAZIONE (TAB SWITCHING SPA)
+  // ==========================================================================
+  const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+  const dashboardGrid = document.querySelector('.dashboard-grid');
+
+  function handleNavigation() {
+    const hash = window.location.hash || '#dashboard';
+    
+    // Rimuovi la classe attiva da tutti gli elementi di navigazione
+    navItems.forEach(item => item.classList.remove('active'));
+    
+    // Rimuovi le classi di visualizzazione esclusiva dalla griglia
+    dashboardGrid.classList.remove('show-only-tickets', 'show-only-analytics');
+    
+    if (hash === '#tickets') {
+      const activeNav = document.getElementById('nav-tickets');
+      if (activeNav) activeNav.classList.add('active');
+      dashboardGrid.classList.add('show-only-tickets');
+    } else if (hash === '#analytics') {
+      const activeNav = document.getElementById('nav-analytics');
+      if (activeNav) activeNav.classList.add('active');
+      dashboardGrid.classList.add('show-only-analytics');
+    } else {
+      // Default: Dashboard (mostra entrambi)
+      const activeNav = document.getElementById('nav-dashboard');
+      if (activeNav) activeNav.classList.add('active');
+    }
+  }
+
+  window.addEventListener('hashchange', handleNavigation);
+  handleNavigation(); // Esegui anche all'avvio caricando il tab corretto se presente nell'URL
+
+  // ==========================================================================
   // 11. INIZIALIZZAZIONE AVVIO (Eseguita alla fine dopo tutte le dichiarazioni)
   // ==========================================================================
   
