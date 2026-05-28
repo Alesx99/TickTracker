@@ -1439,15 +1439,14 @@ document.addEventListener('DOMContentLoaded', () => {
           const activeNav = document.getElementById('nav-analytics');
           if (activeNav) activeNav.classList.add('active');
           dashboardGrid.classList.add('show-only-analytics');
-          // Forza il ridisegno dei grafici per adattarli allo spazio visibile
-          updateCharts(getFilteredTickets());
         } else {
           // Default: Dashboard (mostra entrambi)
           const activeNav = document.getElementById('nav-dashboard');
           if (activeNav) activeNav.classList.add('active');
-          // Forza il ridisegno dei grafici per adattarli allo spazio visibile
-          updateCharts(getFilteredTickets());
         }
+        
+        // Rerenderizza l'intera vista dei ticket per assicurare il caricamento corretto di tabella, KPI e grafici
+        renderApp();
       }
     }
   }
