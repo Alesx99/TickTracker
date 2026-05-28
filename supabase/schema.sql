@@ -39,3 +39,33 @@ CREATE INDEX IF NOT EXISTS idx_tickets_status ON public.tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tickets_emission_date ON public.tickets(emission_date);
 CREATE INDEX IF NOT EXISTS idx_tickets_competence_date ON public.tickets(competence_date);
 CREATE INDEX IF NOT EXISTS idx_tickets_agency ON public.tickets(agency);
+
+-- Creazione tabella agencies
+CREATE TABLE IF NOT EXISTS public.agencies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Abilitiamo Row Level Security (RLS) su agencies
+ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
+
+-- Creazione policy permissiva per lo sviluppo su agencies
+CREATE POLICY "Consenti accesso completo a tutti con anon key su agencies" 
+ON public.agencies 
+FOR ALL 
+TO anon 
+USING (true) 
+WITH CHECK (true);
+
+-- Indice per ottimizzare la ricerca per nome
+CREATE INDEX IF NOT EXISTS idx_agencies_name ON public.agencies(name);
+
+-- Inseriamo agenzie di default per popolare l'applicazione
+INSERT INTO public.agencies (name) VALUES 
+('Eurobet'), 
+('Goldbet'), 
+('Planetwin365'), 
+('SNAI'), 
+('Bet365')
+ON CONFLICT (name) DO NOTHING;

@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // 1. STATO DELL'APPLICAZIONE
   // ==========================================================================
   let tickets = [];
+  let agenciesList = [
+    { id: 'default-1', name: 'Eurobet', created_at: '2026-05-28T00:00:00Z' },
+    { id: 'default-2', name: 'Goldbet', created_at: '2026-05-28T00:00:00Z' },
+    { id: 'default-3', name: 'Planetwin365', created_at: '2026-05-28T00:00:00Z' },
+    { id: 'default-4', name: 'SNAI', created_at: '2026-05-28T00:00:00Z' },
+    { id: 'default-5', name: 'Bet365', created_at: '2026-05-28T00:00:00Z' }
+  ];
   let charts = {
     netProfit: null,
     agencyVolume: null
@@ -73,6 +80,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveDataLocal() {
     localStorage.setItem('bettracker_tickets', JSON.stringify(tickets));
+  }
+
+  async function loadAgencies() {
+    try {
+      const response = await fetch(`${API_URL}/api/agencies`);
+      if (!response.ok) throw new Error('Impossibile caricare le agenzie dal database cloud');
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        agenciesList = data;
+      }
+    } catch (e) {
+      console.warn('Errore nel recupero agenzie, uso localStorage come fallback:', e);
+      const savedAgencies = localStorage.getItem('bettracker_agencies');
+      if (savedAgencies) {
+        try {
+          const parsed = JSON.parse(savedAgencies);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            agenciesList = parsed;
+          }
+        } catch (err) {
+          // Mantieni i default impostati nello stato
+        }
+      }
+    }
+  }
+
+  function saveAgenciesLocal() {
+    localStorage.setItem('bettracker_agencies', JSON.stringify(agenciesList));
+  }
+
+  async function addAgency(name) {
+    const payload = { name };
+    try {
+      const response = await fetch(`${API_URL}/api/agencies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Salvataggio agenzia fallito');
+      const created = await response.json();
+      agenciesList.push(created);
+      saveAgenciesLocal();
+    } catch (err) {
+      console.error('Errore nel salvataggio agenzia sul cloud, fallback locale:', err);
+      const localAgency = {
+        id: 'local-' + Date.now(),
+        name,
+        created_at: new Date().toISOString()
+      };
+      agenciesList.push(localAgency);
+      saveAgenciesLocal();
+      alert('Impossibile salvare l\'agenzia sul cloud. Salvata temporaneamente solo in locale.');
+    }
+  }
+
+  async function deleteAgency(id, name) {
+    try {
+      if (id && !id.startsWith('local-') && !id.startsWith('default-')) {
+        const response = await fetch(`${API_URL}/api/agencies/${id}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Cancellazione agenzia fallita');
+      }
+      
+      agenciesList = agenciesList.filter(a => a.id !== id);
+      saveAgenciesLocal();
+    } catch (err) {
+      console.error('Errore nella cancellazione dell\'agenzia sul cloud, fallback locale:', err);
+      agenciesList = agenciesList.filter(a => a.id !== id);
+      saveAgenciesLocal();
+      alert('Impossibile cancellare l\'agenzia sul cloud. Rimossa solo in locale.');
+    }
   }
 
   // Esportazione JSON (Backup Completo)
@@ -394,17 +473,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Popola la select delle agenzie dinamicamente in base ai ticket salvati
+  // Popola la select delle agenzie dinamicamente in base alle agenzie gestite
   function updateAgencyFilterOptions() {
     if (!filterAgency) return;
     const currentSelected = filterAgency.value;
     
-    // Trova tutte le agenzie univoche (escludendo valori falsy)
-    const uniqueAgencies = [...new Set(tickets.map(t => t.agency).filter(Boolean))].sort();
+    // Ottieni i nomi delle agenzie ordinarli alfabeticamente
+    const sortedAgencies = [...new Set(agenciesList.map(a => a.name).filter(Boolean))].sort();
     
     // Costruisci le opzioni
     filterAgency.innerHTML = '<option value="all">Tutte le agenzie</option>';
-    uniqueAgencies.forEach(agency => {
+    sortedAgencies.forEach(agency => {
       const option = document.createElement('option');
       option.value = agency;
       option.textContent = agency;
@@ -416,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const datalist = document.getElementById('datalist-agencies');
     if (datalist) {
       datalist.innerHTML = '';
-      uniqueAgencies.forEach(agency => {
+      sortedAgencies.forEach(agency => {
         const option = document.createElement('option');
         option.value = agency;
         datalist.appendChild(option);
@@ -1210,10 +1289,104 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================================================
-  // 10. GESTIONE NAVIGAZIONE (TAB SWITCHING SPA)
+  // 10. GESTIONE INTERFACCIA AGENZIE (RENDERING & EVENTI)
+  // ==========================================================================
+  const agenciesTableBody = document.getElementById('agencies-table-body');
+  const agenciesCountBadge = document.getElementById('agencies-count');
+  const agencyForm = document.getElementById('agency-form');
+  const agencyNameInput = document.getElementById('agency-name-input');
+
+  function renderAgenciesPage() {
+    if (!agenciesTableBody) return;
+    agenciesTableBody.innerHTML = '';
+    
+    if (agenciesList.length === 0) {
+      agenciesTableBody.innerHTML = `
+        <tr>
+          <td colspan="3" class="text-center py-5 text-muted">
+            Nessuna agenzia salvata. Aggiungine una tramite il form a sinistra.
+          </td>
+        </tr>
+      `;
+      if (agenciesCountBadge) agenciesCountBadge.textContent = 'Mostrate 0 agenzie';
+      return;
+    }
+
+    // Ordina le agenzie in ordine alfabetico
+    const sortedAgencies = [...agenciesList].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    sortedAgencies.forEach(agency => {
+      const tr = document.createElement('tr');
+      const creationDate = agency.created_at ? formatDateString(agency.created_at.slice(0, 10)) : '-';
+      
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(agency.name)}</strong></td>
+        <td>${creationDate}</td>
+        <td class="text-right">
+          <button class="btn-icon delete-agency" data-id="${agency.id}" data-name="${escapeHtml(agency.name)}" title="Elimina agenzia">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </td>
+      `;
+      agenciesTableBody.appendChild(tr);
+    });
+
+    if (agenciesCountBadge) {
+      agenciesCountBadge.textContent = `Mostrate ${sortedAgencies.length} agenzie`;
+    }
+
+    // Aggiungi event listener per eliminazione agenzia
+    agenciesTableBody.querySelectorAll('.btn-icon.delete-agency').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+        
+        if (confirm(`Sei sicuro di voler eliminare l'agenzia "${name}"? Questa azione non influirà sui ticket esistenti.`)) {
+          showLoadingState();
+          await deleteAgency(id, name);
+          renderAgenciesPage();
+          renderApp();
+        }
+      });
+    });
+
+    // Inizializza le icone Lucide create dinamicamente
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  }
+
+  // Gestore del form inserimento agenzia
+  if (agencyForm) {
+    agencyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = agencyNameInput.value.trim();
+      if (!name) return;
+
+      // Verifica duplicati (case-insensitive)
+      const exists = agenciesList.some(a => a.name.toLowerCase() === name.toLowerCase());
+      if (exists) {
+        alert('Questa agenzia esiste già.');
+        return;
+      }
+
+      showLoadingState();
+      await addAgency(name);
+      agencyNameInput.value = '';
+      renderAgenciesPage();
+      renderApp();
+    });
+  }
+
+  // ==========================================================================
+  // 11. GESTIONE NAVIGAZIONE (TAB SWITCHING SPA)
   // ==========================================================================
   const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
   const dashboardGrid = document.querySelector('.dashboard-grid');
+  
+  const kpiGrid = document.querySelector('.kpi-grid');
+  const filtersSection = document.querySelector('.filters-section');
+  const sectionAgencies = document.getElementById('section-agencies');
 
   function handleNavigation() {
     const hash = window.location.hash || '#dashboard';
@@ -1221,32 +1394,54 @@ document.addEventListener('DOMContentLoaded', () => {
     // Rimuovi la classe attiva da tutti gli elementi di navigazione
     navItems.forEach(item => item.classList.remove('active'));
     
-    // Rimuovi le classi di visualizzazione esclusiva dalla griglia
-    dashboardGrid.classList.remove('show-only-tickets', 'show-only-analytics');
-    
-    if (hash === '#tickets') {
-      const activeNav = document.getElementById('nav-tickets');
+    if (hash === '#agencies') {
+      const activeNav = document.getElementById('nav-agencies');
       if (activeNav) activeNav.classList.add('active');
-      dashboardGrid.classList.add('show-only-tickets');
-    } else if (hash === '#analytics') {
-      const activeNav = document.getElementById('nav-analytics');
-      if (activeNav) activeNav.classList.add('active');
-      dashboardGrid.classList.add('show-only-analytics');
-      // Forza il ridisegno dei grafici per adattarli allo spazio visibile
-      updateCharts(getFilteredTickets());
+      
+      // Nascondi elementi specifici dei ticket
+      if (kpiGrid) kpiGrid.classList.add('hidden');
+      if (filtersSection) filtersSection.classList.add('hidden');
+      if (dashboardGrid) dashboardGrid.classList.add('hidden');
+      if (sectionAgencies) sectionAgencies.classList.remove('hidden');
+      
+      // Renderizza la pagina delle agenzie
+      renderAgenciesPage();
     } else {
-      // Default: Dashboard (mostra entrambi)
-      const activeNav = document.getElementById('nav-dashboard');
-      if (activeNav) activeNav.classList.add('active');
-      // Forza il ridisegno dei grafici per adattarli allo spazio visibile
-      updateCharts(getFilteredTickets());
+      // Mostra elementi dei ticket
+      if (kpiGrid) kpiGrid.classList.remove('hidden');
+      if (filtersSection) filtersSection.classList.remove('hidden');
+      if (dashboardGrid) dashboardGrid.classList.remove('hidden');
+      if (sectionAgencies) sectionAgencies.classList.add('hidden');
+      
+      // Rimuovi le classi di visualizzazione esclusiva dalla griglia
+      if (dashboardGrid) {
+        dashboardGrid.classList.remove('show-only-tickets', 'show-only-analytics');
+        
+        if (hash === '#tickets') {
+          const activeNav = document.getElementById('nav-tickets');
+          if (activeNav) activeNav.classList.add('active');
+          dashboardGrid.classList.add('show-only-tickets');
+        } else if (hash === '#analytics') {
+          const activeNav = document.getElementById('nav-analytics');
+          if (activeNav) activeNav.classList.add('active');
+          dashboardGrid.classList.add('show-only-analytics');
+          // Forza il ridisegno dei grafici per adattarli allo spazio visibile
+          updateCharts(getFilteredTickets());
+        } else {
+          // Default: Dashboard (mostra entrambi)
+          const activeNav = document.getElementById('nav-dashboard');
+          if (activeNav) activeNav.classList.add('active');
+          // Forza il ridisegno dei grafici per adattarli allo spazio visibile
+          updateCharts(getFilteredTickets());
+        }
+      }
     }
   }
 
   window.addEventListener('hashchange', handleNavigation);
 
   // ==========================================================================
-  // 11. INIZIALIZZAZIONE AVVIO (Eseguita in modo sequenziale)
+  // 12. INIZIALIZZAZIONE AVVIO (Eseguita in modo sequenziale)
   // ==========================================================================
   async function initApp() {
     // Inizializza la configurazione iniziale dei grafici
@@ -1256,6 +1451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     handleNavigation();
     
     // Carica dati dal database cloud o fallback locale
+    await loadAgencies();
     await loadData();
     
     // Se l'elenco è vuoto sia nel database che in locale, genera dati demo

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- Foglio di Stile Personalizzato -->
-  <link rel="stylesheet" href="style.css?v=1.0.2">
+  <link rel="stylesheet" href="style.css?v=1.0.3">
   
   <!-- Librerie CDN -->
   <!-- Chart.js per i Grafici -->
@@ -47,6 +47,10 @@
         <a href="#analytics" class="nav-item" id="nav-analytics">
           <i data-lucide="pie-chart"></i>
           <span>Statistiche</span>
+        </a>
+        <a href="#agencies" class="nav-item" id="nav-agencies">
+          <i data-lucide="building-2"></i>
+          <span>Gestione Agenzie</span>
         </a>
       </nav>
       
@@ -300,9 +304,54 @@
                 </div>
               </div>
             </div>
-          </section>
-          
         </div>
+
+        <!-- 3. Sezione Gestione Agenzie -->
+        <section class="agencies-section bg-glass hidden" id="section-agencies">
+          <div class="section-header">
+            <h2>Gestione Agenzie</h2>
+            <span class="badge" id="agencies-count">Mostrate 0 agenzie</span>
+          </div>
+          
+          <div class="agencies-content">
+            <!-- Form per aggiungere agenzia (Sinistra) -->
+            <div class="agency-add-card">
+              <h3>Aggiungi Nuova Agenzia</h3>
+              <form id="agency-form" class="mt-3">
+                <div class="form-group">
+                  <label for="agency-name-input">Nome Agenzia *</label>
+                  <input type="text" id="agency-name-input" class="form-control" required placeholder="Es. Betfair, Stanleybet">
+                </div>
+                <button type="submit" class="btn btn-primary mt-3 w-100">
+                  <i data-lucide="plus-circle"></i> Aggiungi Agenzia
+                </button>
+              </form>
+            </div>
+            
+            <!-- Tabella/Elenco agenzie esistenti (Destra) -->
+            <div class="agency-list-card">
+              <h3>Elenco Agenzie</h3>
+              <div class="table-responsive mt-3">
+                <table class="tickets-table">
+                  <thead>
+                    <tr>
+                      <th>Nome Agenzia</th>
+                      <th>Data Creazione</th>
+                      <th class="text-right">Azioni</th>
+                    </tr>
+                  </thead>
+                  <tbody id="agencies-table-body">
+                    <tr>
+                      <td colspan="3" class="text-center py-5 text-muted">
+                        Caricamento agenzie in corso...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
         
       </div>
     </main>
@@ -424,6 +473,6 @@
   </dialog>
 
   <!-- Script Logico principale dell'applicazione -->
-  <script src="app.js?v=1.0.2"></script>
+  <script src="app.js?v=1.0.3"></script>
 </body>
 </html>

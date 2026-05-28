@@ -184,6 +184,62 @@ app.delete('/api/tickets-all/reset', async (req, res) => {
   }
 });
 
+// ==========================================================================
+// ROTTE API PER AGENZIE
+// ==========================================================================
+
+// 1. GET ALL AGENCIES
+app.get('/api/agencies', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('agencies')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    console.error('Errore nel caricamento delle agenzie:', error.message);
+    res.status(500).json({ error: 'Errore durante il recupero delle agenzie' });
+  }
+});
+
+// 2. CREATE AGENCY
+app.post('/api/agencies', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Il nome dell\'agenzia è richiesto' });
+    
+    const { data, error } = await supabase
+      .from('agencies')
+      .insert([{ name }])
+      .select();
+
+    if (error) throw error;
+    res.status(201).json(data[0]);
+  } catch (error) {
+    console.error('Errore nella creazione dell\'agenzia:', error.message);
+    res.status(500).json({ error: 'Errore durante la creazione dell\'agenzia' });
+  }
+});
+
+// 3. DELETE AGENCY
+app.delete('/api/agencies/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabase
+      .from('agencies')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ message: 'Agenzia eliminata con successo', id });
+  } catch (error) {
+    console.error(`Errore nella cancellazione dell'agenzia ${id}:`, error.message);
+    res.status(500).json({ error: 'Errore durante l\'eliminazione dell\'agenzia' });
+  }
+});
+
 // Rotta per il controllo dello stato (Healthcheck)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });

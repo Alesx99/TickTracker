@@ -957,6 +957,31 @@ body {
   display: none !important;
 }
 
+/* Stili di Gestione Agenzie */
+.agencies-section {
+  overflow: hidden;
+}
+
+.agencies-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+  padding: 24px;
+}
+
+.agency-add-card, .agency-list-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.agency-add-card {
+  background-color: rgba(11, 15, 25, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  height: fit-content;
+}
+
 /* 9. RESPONSIVE DESIGN (MEDIA QUERIES) */
 @media (max-width: 1200px) {
   .dashboard-grid {
@@ -1022,6 +1047,12 @@ body {
 
   .top-header {
     padding: 16px;
+  }
+
+  .agencies-content {
+    grid-template-columns: 1fr;
+    padding: 12px 0;
+    gap: 20px;
   }
 }
 
