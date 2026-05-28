@@ -1,0 +1,16 @@
+# Dipendenze Node.js
+node_modules/
+/server/node_modules/
+package-lock.json
+/server/package-lock.json
+
+# Variabili d'ambiente sensibili
+.env
+/server/.env
+
+# File temporanei e di sistema
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BetTracker Pro - Gestione e Tracking Ticket</title>
+  
+  <!-- Font Google Outfit per estetica premium -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Foglio di Stile Personalizzato -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Librerie CDN -->
+  <!-- Chart.js per i Grafici -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS per esportazione Excel (.xlsx) nativa -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons per icone vettoriali moderne -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.395.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+  
+  <!-- Layout Wrapper -->
+  <div class="app-container">
+    
+    <!-- Sidebar / Navigazione -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <i data-lucide="trending-up"></i>
+        </div>
+        <span class="brand-name">BetTracker <span class="brand-tag">PRO</span></span>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="nav-item active" id="nav-dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#tickets" class="nav-item" id="nav-tickets">
+          <i data-lucide="ticket"></i>
+          <span>Elenco Ticket</span>
+        </a>
+        <a href="#analytics" class="nav-item" id="nav-analytics">
+          <i data-lucide="pie-chart"></i>
+          <span>Statistiche</span>
+        </a>
+      </nav>
+      
+      <!-- Sezione Backup e Ripristino in fondo alla Sidebar -->
+      <div class="sidebar-footer">
+        <div class="data-actions-label">Gestione Dati</div>
+        <div class="data-actions-grid">
+          <button id="btn-export-json" class="btn btn-secondary btn-sm" title="Esporta file di backup JSON">
+            <i data-lucide="download"></i> Esporta Backup
+          </button>
+          <button id="btn-import-trigger" class="btn btn-secondary btn-sm" title="Importa file di backup JSON">
+            <i data-lucide="upload"></i> Importa Backup
+          </button>
+          <input type="file" id="file-import-json" accept=".json" style="display: none;">
+        </div>
+        
+        <button id="btn-demo-data" class="btn btn-accent btn-sm mt-3">
+          <i data-lucide="sparkles"></i> Genera Dati Demo
+        </button>
+      </div>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-title-area">
+          <h1>Pannello di Controllo</h1>
+          <p class="subtitle">Tracciamento e resoconti settimanali dei ticket</p>
+        </div>
+        
+        <!-- Controlli del periodo temporale ed azioni rapide -->
+        <div class="header-actions">
+          <div class="period-selector">
+            <label for="select-period" class="sr-only">Periodo</label>
+            <i data-lucide="calendar" class="input-icon-left"></i>
+            <select id="select-period" class="form-control select-control">
+              <option value="current-week">Questa Settimana</option>
+              <option value="last-week">Settimana Scorsa</option>
+              <option value="current-month">Questo Mese</option>
+              <option value="all-time" selected>Tutto lo Storico</option>
+              <option value="custom">Intervallo Personalizzato...</option>
+            </select>
+          </div>
+          
+          <div id="custom-date-range" class="custom-date-range hidden">
+            <input type="date" id="custom-start-date" class="form-control date-input">
+            <span>al</span>
+            <input type="date" id="custom-end-date" class="form-control date-input">
+          </div>
+          
+          <button id="btn-add-ticket" class="btn btn-primary">
+            <i data-lucide="plus-circle"></i> Aggiungi Ticket
+          </button>
+          
+          <button id="btn-export-excel" class="btn btn-success">
+            <i data-lucide="file-spreadsheet"></i> Esporta Excel
+          </button>
+        </div>
+      </header>
+      
+      <!-- Sezione Principale -->
+      <div class="content-scrollable">
+        
+        <!-- 1. Griglia delle Metriche (KPI Cards) -->
+        <section class="kpi-grid">
+          
+          <!-- Card Giocato -->
+          <div class="kpi-card bg-glass">
+            <div class="kpi-header">
+              <span class="kpi-title">Totale Giocato</span>
+              <div class="kpi-icon icon-blue">
+                <i data-lucide="coins"></i>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-total-played">€ 0.00</div>
+            <div class="kpi-footer">
+              <span class="kpi-subtext" id="kpi-played-count">0 ticket totali</span>
+            </div>
+          </div>
+          
+          <!-- Card Vinto -->
+          <div class="kpi-card bg-glass">
+            <div class="kpi-header">
+              <span class="kpi-title">Totale Vinto</span>
+              <div class="kpi-icon icon-green">
+                <i data-lucide="award"></i>
+              </div>
+            </div>
+            <div class="kpi-value text-green" id="kpi-total-won">€ 0.00</div>
+            <div class="kpi-footer">
+              <span class="kpi-subtext" id="kpi-won-count">0 ticket vinti</span>
+            </div>
+          </div>
+          
+          <!-- Card Perso -->
+          <div class="kpi-card bg-glass">
+            <div class="kpi-header">
+              <span class="kpi-title">Totale Perso</span>
+              <div class="kpi-icon icon-red">
+                <i data-lucide="thumbs-down"></i>
+              </div>
+            </div>
+            <div class="kpi-value text-red" id="kpi-total-lost">€ 0.00</div>
+            <div class="kpi-footer">
+              <span class="kpi-subtext" id="kpi-lost-count">0 ticket persi</span>
+            </div>
+          </div>
+          
+          <!-- Card Bilancio Netto -->
+          <div class="kpi-card bg-glass">
+            <div class="kpi-header">
+              <span class="kpi-title">Bilancio Netto (ROI)</span>
+              <div class="kpi-icon" id="kpi-balance-icon">
+                <i data-lucide="dollar-sign"></i>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-net-balance">€ 0.00</div>
+            <div class="kpi-footer">
+              <span class="kpi-subtext" id="kpi-roi-percentage">ROI: 0%</span>
+            </div>
+          </div>
+          
+          <!-- Card Ticket Aperti -->
+          <div class="kpi-card bg-glass">
+            <div class="kpi-header">
+              <span class="kpi-title">Ticket Aperti (In Corso)</span>
+              <div class="kpi-icon icon-amber">
+                <i data-lucide="clock"></i>
+              </div>
+            </div>
+            <div class="kpi-value text-amber" id="kpi-open-count">0</div>
+            <div class="kpi-footer">
+              <span class="kpi-subtext" id="kpi-open-potential-winnings">Vincita Potenziale: € 0.00</span>
+            </div>
+          </div>
+          
+        </section>
+        
+        <!-- 2. Pannello Filtri e Ricerca -->
+        <section class="filters-section bg-glass">
+          <div class="filters-wrapper">
+            
+            <!-- Ricerca Testo -->
+            <div class="filter-group flex-grow">
+              <label for="filter-search" class="filter-label">Cerca</label>
+              <div class="input-relative">
+                <i data-lucide="search" class="input-icon-left"></i>
+                <input type="text" id="filter-search" class="form-control" placeholder="Cerca agenzia, evento o esito...">
+              </div>
+            </div>
+            
+            <!-- Filtro Stato -->
+            <div class="filter-group">
+              <label for="filter-status" class="filter-label">Stato Ticket</label>
+              <select id="filter-status" class="form-control">
+                <option value="all">Tutti gli stati</option>
+                <option value="aperto">Aperto</option>
+                <option value="vinto">Vinto</option>
+                <option value="perso">Perso</option>
+              </select>
+            </div>
+            
+            <!-- Filtro Agenzia -->
+            <div class="filter-group">
+              <label for="filter-agency" class="filter-label">Agenzia</label>
+              <select id="filter-agency" class="form-control">
+                <option value="all">Tutte le agenzie</option>
+                <!-- Opzioni popolate dinamicamente -->
+              </select>
+            </div>
+            
+            <!-- Filtro Data Tipo -->
+            <div class="filter-group">
+              <label for="filter-date-type" class="filter-label">Riferimento Data</label>
+              <select id="filter-date-type" class="form-control">
+                <option value="emission">Data Emissione</option>
+                <option value="competence">Data Competenza</option>
+              </select>
+            </div>
+            
+            <!-- Pulsante Resetta Filtri -->
+            <div class="filter-group align-self-end">
+              <button id="btn-reset-filters" class="btn btn-secondary w-100" title="Resetta tutti i filtri">
+                <i data-lucide="rotate-ccw"></i> Reset
+              </button>
+            </div>
+            
+          </div>
+        </section>
+        
+        <!-- Container a due colonne per Tabella e Grafici -->
+        <div class="dashboard-grid">
+          
+          <!-- Sezione Sinistra: Elenco Ticket (Tabella) -->
+          <section class="table-container bg-glass" id="section-tickets">
+            <div class="section-header">
+              <h2>Dettaglio Ticket</h2>
+              <span class="badge" id="filtered-tickets-count">Mostrati 0 ticket</span>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="tickets-table">
+                <thead>
+                  <tr>
+                    <th>Agenzia</th>
+                    <th>Evento</th>
+                    <th>Esito Giocato</th>
+                    <th>Stato</th>
+                    <th>Quota</th>
+                    <th>Giocato</th>
+                    <th>Vincita Effettiva</th>
+                    <th>Emissione</th>
+                    <th>Competenza</th>
+                    <th class="text-right">Azioni</th>
+                  </tr>
+                </thead>
+                <tbody id="tickets-table-body">
+                  <!-- Righe popolate dinamicamente da app.js -->
+                  <tr>
+                    <td colspan="10" class="text-center py-5 text-muted">
+                      Nessun ticket trovato. Clicca su "Aggiungi Ticket" o "Genera Dati Demo" per iniziare.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          <!-- Sezione Destra: Grafici ed Analytics -->
+          <section class="analytics-container bg-glass" id="section-analytics">
+            <div class="section-header">
+              <h2>Analisi Grafica</h2>
+            </div>
+            
+            <div class="charts-wrapper">
+              <!-- Grafico Profitto Netto -->
+              <div class="chart-card">
+                <h3>Profitto Netto per Settimana (€)</h3>
+                <div class="chart-canvas-container">
+                  <canvas id="chart-net-profit"></canvas>
+                </div>
+              </div>
+              
+              <!-- Grafico Volume per Agenzia -->
+              <div class="chart-card">
+                <h3>Volume Giocato per Agenzia (€)</h3>
+                <div class="chart-canvas-container">
+                  <canvas id="chart-agency-volume"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+          
+        </div>
+        
+      </div>
+    </main>
+  </div>
+  
+  <!-- =======================================================
+       MODALE MODIFICA / INSERIMENTO TICKET (<dialog>)
+       ======================================================= -->
+  <dialog id="ticket-modal" closedby="any" class="custom-dialog bg-glass">
+    <div class="modal-wrapper">
+      <div class="modal-header">
+        <h2 id="modal-title">Nuovo Ticket</h2>
+        <button class="btn-close-modal" id="btn-close-ticket-modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      
+      <form id="ticket-form" method="dialog">
+        <!-- ID Nascosto per modifica -->
+        <input type="hidden" id="form-ticket-id">
+        
+        <div class="form-grid">
+          <!-- Agenzia di Riferimento -->
+          <div class="form-group">
+            <label for="form-agency">Agenzia di Riferimento *</label>
+            <input type="text" id="form-agency" list="datalist-agencies" required placeholder="Es. Eurobet, Goldbet">
+            <datalist id="datalist-agencies">
+              <!-- Popolato dinamicamente da app.js -->
+            </datalist>
+          </div>
+          
+          <!-- Nome Evento -->
+          <div class="form-group">
+            <label for="form-event">Nome Evento/i *</label>
+            <input type="text" id="form-event" required placeholder="Es. Juventus - Milan o Multipla">
+          </div>
+          
+          <!-- Esito Giocato -->
+          <div class="form-group">
+            <label for="form-outcome">Esito Giocato *</label>
+            <input type="text" id="form-outcome" required placeholder="Es. 1, Over 2.5, GG">
+          </div>
+          
+          <!-- Stato Ticket -->
+          <div class="form-group">
+            <label for="form-status">Stato del Ticket *</label>
+            <select id="form-status" required>
+              <option value="aperto">Aperto (In Corso)</option>
+              <option value="vinto">Vinto</option>
+              <option value="perso">Perso</option>
+            </select>
+          </div>
+          
+          <!-- Quota -->
+          <div class="form-group">
+            <label for="form-odds">Quota Biglietto *</label>
+            <input type="number" id="form-odds" min="1.01" step="0.01" required placeholder="Es. 2.10">
+          </div>
+          
+          <!-- Importo Giocato -->
+          <div class="form-group">
+            <label for="form-amount">Importo Giocato (€) *</label>
+            <input type="number" id="form-amount" min="0.1" step="0.01" required placeholder="Es. 10.00">
+          </div>
+          
+          <!-- Data di Emissione -->
+          <div class="form-group">
+            <label for="form-emission-date">Data di Emissione *</label>
+            <input type="date" id="form-emission-date" required>
+          </div>
+          
+          <!-- Data di Competenza -->
+          <div class="form-group">
+            <label for="form-competence-date">Data di Competenza *</label>
+            <input type="date" id="form-competence-date" required>
+          </div>
+          
+          <!-- Vincita Effettiva (Disponibile o Calcolata in base allo stato) -->
+          <div class="form-group full-width" id="group-winnings">
+            <div class="winnings-header">
+              <label for="form-winnings">Vincita Effettiva (€)</label>
+              <span id="potential-winnings-hint" class="potential-hint">Potenziale: € 0.00</span>
+            </div>
+            <input type="number" id="form-winnings" min="0" step="0.01" placeholder="Se vinto, autocalcolato: Giocato x Quota">
+            <small class="form-help-text">Puoi inserire un importo personalizzato per considerare eventuali bonus o detrazioni fiscali.</small>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-ticket">Annulla</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-ticket">Salva Ticket</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- =======================================================
+       MODALE CONFERMA ELIMINAZIONE (<dialog>)
+       ======================================================= -->
+  <dialog id="delete-confirm-modal" closedby="any" class="custom-dialog bg-glass sm-modal">
+    <div class="modal-wrapper">
+      <div class="modal-header">
+        <h2>Conferma Eliminazione</h2>
+        <button class="btn-close-modal" id="btn-close-delete-modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body py-4">
+        <p>Sei sicuro di voler eliminare questo ticket? Questa azione è irreversibile.</p>
+        <div class="ticket-summary-delete mt-3 text-muted" id="delete-ticket-summary">
+          <!-- Popolato dinamicamente da app.js -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-delete">Annulla</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-delete">Elimina</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Script Logico principale dell'applicazione -->
+  <script src="app.js"></script>
+</body>
+</html>
