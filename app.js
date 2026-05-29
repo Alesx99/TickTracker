@@ -60,7 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Wrapper di fetch locale con timeout per evitare connessioni sospese (es. server offline o standby)
   const nativeFetch = window.fetch;
   const fetch = async (resource, options = {}) => {
-    const { timeout = 4000 } = options;
+    // Se la chiamata è rivolta a Render, aumentiamo il timeout a 60 secondi
+    // per attendere il risveglio dell'istanza dallo standby (cold start).
+    const isCloud = typeof resource === 'string' && resource.includes('onrender.com');
+    const defaultTimeout = isCloud ? 60000 : 4000;
+    
+    const { timeout = defaultTimeout } = options;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     
