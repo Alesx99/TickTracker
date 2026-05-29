@@ -717,8 +717,8 @@ document.addEventListener('DOMContentLoaded', () => {
       
       roiPercentageEl.textContent = `ROI: ${periodRoi}%`;
     }
-    document.getElementById('kpi-open-count').textContent = openCount;
-    document.getElementById('kpi-open-potential-winnings').textContent = `Vincita Potenziale: ${formatEuro(openPotentialWinnings)}`;
+    document.getElementById('kpi-open-count').textContent = periodOpenCount;
+    document.getElementById('kpi-open-potential-winnings').textContent = `Vincita Potenziale: ${formatEuro(periodOpenPotential)}`;
     
     // 3. Rerenderizza Numero Record Mostrati
     document.getElementById('filtered-tickets-count').textContent = `Mostrati ${filtered.length} ticket`;
