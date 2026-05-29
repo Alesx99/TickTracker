@@ -144,6 +144,39 @@ body {
   color: var(--text-secondary);
 }
 
+.btn-sync-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: var(--transition-fast);
+  margin-left: auto;
+}
+
+.btn-sync-icon:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.btn-sync-icon i {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-sync-icon i.spin-animation {
+  animation: spin-cw 1s linear infinite;
+}
+
+@keyframes spin-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .db-status-dot {
   width: 8px;
   height: 8px;

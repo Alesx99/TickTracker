@@ -52,20 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. FUNZIONI DI PERSISTENZA, CARICAMENTO E BACKUP
   // ==========================================================================
   
-  // URL del Backend (su localhost, file:/// o Render)
-  const API_URL = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '' || location.protocol === 'file:'
-    ? 'http://localhost:3000'
-    : 'https://ticktracker.onrender.com';
+  // URL del Backend (Forzato solo Cloud)
+  const API_URL = 'https://ticktracker.onrender.com';
 
-  // Wrapper di fetch locale con timeout per evitare connessioni sospese (es. server offline o standby)
+  // Wrapper di fetch locale con timeout fisso a 60 secondi per dare tempo al Cloud (Render) di svegliarsi dallo standby
   const nativeFetch = window.fetch;
   const fetch = async (resource, options = {}) => {
-    // Se la chiamata è rivolta a Render, aumentiamo il timeout a 60 secondi
-    // per attendere il risveglio dell'istanza dallo standby (cold start).
-    const isCloud = typeof resource === 'string' && resource.includes('onrender.com');
-    const defaultTimeout = isCloud ? 60000 : 4000;
-    
-    const { timeout = defaultTimeout } = options;
+    const { timeout = 60000 } = options;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     
@@ -482,6 +475,27 @@ document.addEventListener('DOMContentLoaded', () => {
       initialCapitalDate = inputInitCapitalDate.value || '';
       localStorage.setItem('bettracker_initial_capital_date', initialCapitalDate);
       renderApp();
+    });
+  }
+
+  // Sincronizzazione manuale cloud
+  const btnSyncCloud = document.getElementById('btn-sync-cloud');
+  if (btnSyncCloud) {
+    btnSyncCloud.addEventListener('click', async () => {
+      const icon = btnSyncCloud.querySelector('i');
+      if (icon) icon.classList.add('spin-animation');
+      
+      showToast('Sincronizzazione cloud in corso...', 'info');
+      try {
+        await loadAgencies();
+        await loadData();
+        renderApp();
+        showToast('Dati sincronizzati dal cloud con successo!', 'success');
+      } catch (err) {
+        showToast('Errore di connessione durante la sincronizzazione.', 'error');
+      } finally {
+        if (icon) icon.classList.remove('spin-animation');
+      }
     });
   }
 
