@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketToDeleteId = null;
   let chartUpdateTimeout = null;
 
+  // Gestione Capitale Iniziale
+  let initialCapital = parseFloat(localStorage.getItem('bettracker_initial_capital')) || 0;
+  let initialCapitalDate = localStorage.getItem('bettracker_initial_capital_date') || '';
+
   // Funzione per aggiornare graficamente lo stato di connessione al database
   function updateDbStatus(status) {
     const dot = document.getElementById('db-status-dot');
@@ -160,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       agenciesList.push(localAgency);
       saveAgenciesLocal();
-      alert('Impossibile salvare l\'agenzia sul cloud. Salvata temporaneamente solo in locale.');
+      showToast('Impossibile salvare l\'agenzia sul cloud. Salvata temporaneamente solo in locale.', 'warning');
     }
   }
 
@@ -182,14 +186,14 @@ document.addEventListener('DOMContentLoaded', () => {
       updateDbStatus('offline');
       agenciesList = agenciesList.filter(a => a.id !== id);
       saveAgenciesLocal();
-      alert('Impossibile cancellare l\'agenzia sul cloud. Rimossa solo in locale.');
+      showToast('Impossibile cancellare l\'agenzia sul cloud. Rimossa solo in locale.', 'warning');
     }
   }
 
   // Esportazione JSON (Backup Completo)
   document.getElementById('btn-export-json').addEventListener('click', () => {
     if (tickets.length === 0) {
-      alert('Nessun dato da esportare.');
+      showToast('Nessun dato da esportare.', 'warning');
       return;
     }
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tickets, null, 2));
@@ -224,7 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
           );
           
           if (isValid) {
-            if (confirm(`Sei sicuro di voler importare ${importedData.length} ticket? Il database corrente verrà sovrascritto.`)) {
+            const isConfirmed = await showConfirm(
+              'Ripristina Backup',
+              `Sei sicuro di voler importare ${importedData.length} ticket? Il database corrente verrà sovrascritto ed eventuali dati locali/cloud non salvati andranno persi.`,
+              'Ripristina',
+              'btn-primary'
+            );
+            if (isConfirmed) {
               try {
                 showLoadingState();
                 updateDbStatus('connecting');
@@ -240,25 +250,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 tickets = await response.json();
                 saveDataLocal();
                 updateDbStatus('online');
-                alert('Backup ripristinato sul database cloud con successo!');
+                showToast('Backup ripristinato sul database cloud con successo!', 'success');
               } catch (err) {
                 console.error('Errore nel ripristino cloud, eseguo fallback locale:', err);
                 updateDbStatus('offline');
                 tickets = importedData;
                 saveDataLocal();
-                alert('Errore di connessione al server. I dati sono stati caricati temporaneamente solo in locale.');
+                showToast('Errore di connessione al server. I dati sono stati caricati temporaneamente solo in locale.', 'warning');
               } finally {
                 renderApp();
               }
             }
           } else {
-            alert('Il file non ha un formato compatibile con BetTracker.');
+            showToast('Il file non ha un formato compatibile con BetTracker.', 'error');
           }
         } else {
-          alert('Il file JSON deve contenere un array di ticket.');
+          showToast('Il file JSON deve contenere un array di ticket.', 'error');
         }
       } catch (err) {
-        alert('Errore nella lettura del file JSON: ' + err.message);
+        showToast('Errore nella lettura del file JSON: ' + err.message, 'error');
       }
       fileImportInput.value = ''; // Resetta l'input
     };
@@ -268,9 +278,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   // 3. GENERAZIONE DATI DEMO
   // ==========================================================================
-  document.getElementById('btn-demo-data').addEventListener('click', () => {
+  document.getElementById('btn-demo-data').addEventListener('click', async () => {
     if (tickets.length > 0) {
-      if (!confirm('Generando i dati demo sovrascriverai i ticket correnti nel database. Vuoi procedere?')) {
+      const isConfirmed = await showConfirm(
+        'Genera Dati Demo',
+        'Generando i dati demo sovrascriverai tutti i ticket correnti nel database. Vuoi procedere?',
+        'Genera',
+        'btn-primary'
+      );
+      if (!isConfirmed) {
         return;
       }
     }
@@ -352,14 +368,14 @@ document.addEventListener('DOMContentLoaded', () => {
       tickets = Array.isArray(data) ? data : demoTickets;
       saveDataLocal();
       updateDbStatus('online');
-      if (notifyUser) alert('Dati demo generati e salvati sul database cloud con successo!');
+      if (notifyUser) showToast('Dati demo generati e salvati sul database cloud con successo!', 'success');
     } catch (err) {
       console.error('Errore durante la generazione dei dati demo cloud:', err);
       updateDbStatus('offline');
       // Fallback locale in caso di errore
       tickets = demoTickets.map((t, idx) => ({ ...t, id: 'local-demo-' + idx }));
       saveDataLocal();
-      if (notifyUser) alert('Errore di connessione. Dati demo salvati solo in locale.');
+      if (notifyUser) showToast('Errore di connessione. Dati demo salvati solo in locale.', 'warning');
     } finally {
       renderApp();
     }
@@ -420,6 +436,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterAgency = document.getElementById('filter-agency');
   const filterDateType = document.getElementById('filter-date-type');
   const btnResetFilters = document.getElementById('btn-reset-filters');
+
+  const inputInitCapital = document.getElementById('input-init-capital');
+  const inputInitCapitalDate = document.getElementById('input-init-capital-date');
+
+  // Inizializza i valori del capitale iniziale da stato
+  if (inputInitCapital) inputInitCapital.value = initialCapital || '';
+  if (inputInitCapitalDate) inputInitCapitalDate.value = initialCapitalDate || '';
+
+  // Eventi per capitale iniziale
+  if (inputInitCapital) {
+    inputInitCapital.addEventListener('input', () => {
+      initialCapital = parseFloat(inputInitCapital.value) || 0;
+      localStorage.setItem('bettracker_initial_capital', initialCapital);
+      renderApp();
+    });
+  }
+  if (inputInitCapitalDate) {
+    inputInitCapitalDate.addEventListener('change', () => {
+      initialCapitalDate = inputInitCapitalDate.value || '';
+      localStorage.setItem('bettracker_initial_capital_date', initialCapitalDate);
+      renderApp();
+    });
+  }
 
   // Mostra/Nascondi intervallo personalizzato
   selectPeriod.addEventListener('change', () => {
@@ -489,6 +528,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Applica i filtri cumulativi
     return tickets.filter(t => {
+      const targetDate = dateTypeVal === 'emission' ? t.emissionDate : t.competenceDate;
+
+      // Se c'è un capitale iniziale con data, i ticket precedenti vengono considerati SOLO se vinti
+      if (initialCapitalDate && targetDate < initialCapitalDate) {
+        if (t.status !== 'vinto') {
+          return false;
+        }
+      }
+
       // Filtro ricerca testo (agenzia, evento, esito)
       const matchesSearch = searchVal === '' || 
         t.agency.toLowerCase().includes(searchVal) || 
@@ -502,7 +550,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const matchesAgency = agencyVal === 'all' || t.agency === agencyVal;
       
       // Filtro date temporali
-      const targetDate = dateTypeVal === 'emission' ? t.emissionDate : t.competenceDate;
       let matchesDate = true;
       if (dateStart && targetDate < dateStart) matchesDate = false;
       if (dateEnd && targetDate > dateEnd) matchesDate = false;
@@ -550,62 +597,126 @@ document.addEventListener('DOMContentLoaded', () => {
     // Aggiorna i selettori filtri (solo le agenzie, se necessario, senza resettare la selezione)
     updateAgencyFilterOptions();
     
-    // 1. Calcola KPI
-    let totalPlayed = 0;
-    let totalWon = 0;
-    let totalLost = 0;
-    let openCount = 0;
-    let openPotentialWinnings = 0;
+    // 1. Calcola KPI Globali per il Capitale Attuale (cumulativi storici da data start)
+    let globalPlayed = 0;
+    let globalWon = 0;
+    
+    tickets.forEach(t => {
+      const amountPlayed = parseFloat(t.amountPlayed) || 0;
+      const actualWinnings = parseFloat(t.actualWinnings) || 0;
+      
+      if (initialCapitalDate) {
+        if (t.emissionDate >= initialCapitalDate) {
+          globalPlayed += amountPlayed;
+          if (t.status === 'vinto') {
+            globalWon += actualWinnings;
+          }
+        } else {
+          // Precedente valutato solo se vinto
+          if (t.status === 'vinto') {
+            globalWon += actualWinnings;
+          }
+        }
+      } else {
+        globalPlayed += amountPlayed;
+        if (t.status === 'vinto') {
+          globalWon += actualWinnings;
+        }
+      }
+    });
+    
+    const currentCapital = initialCapital + globalWon - globalPlayed;
+
+    // 1.1 Calcola KPI del Periodo selezionato
+    let periodPlayed = 0;
+    let periodWon = 0;
+    let periodLost = 0;
+    let periodOpenCount = 0;
+    let periodOpenPotential = 0;
     
     filtered.forEach(t => {
       const amountPlayed = parseFloat(t.amountPlayed) || 0;
       const actualWinnings = parseFloat(t.actualWinnings) || 0;
       const odds = parseFloat(t.odds) || 0;
       
-      totalPlayed += amountPlayed;
+      const isPrevious = initialCapitalDate && t.emissionDate < initialCapitalDate;
+      
+      if (!isPrevious) {
+        periodPlayed += amountPlayed;
+      }
+      
       if (t.status === 'vinto') {
-        totalWon += actualWinnings;
+        periodWon += actualWinnings;
       } else if (t.status === 'perso') {
-        totalLost += amountPlayed;
+        if (!isPrevious) {
+          periodLost += amountPlayed;
+        }
       } else if (t.status === 'aperto') {
-        openCount++;
-        openPotentialWinnings += (amountPlayed * odds);
+        periodOpenCount++;
+        periodOpenPotential += (amountPlayed * odds);
       }
     });
     
-    const netBalance = totalWon - totalPlayed;
-    const roi = totalPlayed > 0 ? ((netBalance / totalPlayed) * 100).toFixed(1) : '0.0';
+    const periodNetProfit = periodWon - periodPlayed;
+    const periodRoi = periodPlayed > 0 ? ((periodNetProfit / periodPlayed) * 100).toFixed(1) : '0.0';
     
-    // 2. Renderizza KPI nel DOM
-    document.getElementById('kpi-total-played').textContent = formatEuro(totalPlayed);
-    document.getElementById('kpi-played-count').textContent = `${filtered.length} ticket totali`;
+    // 2. Renderizza KPI nel DOM (Dati del Periodo)
+    document.getElementById('kpi-total-played').textContent = formatEuro(periodPlayed);
+    document.getElementById('kpi-played-count').textContent = `${filtered.filter(t => !initialCapitalDate || t.emissionDate >= initialCapitalDate).length} ticket periodici`;
     
-    document.getElementById('kpi-total-won').textContent = formatEuro(totalWon);
+    document.getElementById('kpi-total-won').textContent = formatEuro(periodWon);
     document.getElementById('kpi-won-count').textContent = `${filtered.filter(t => t.status === 'vinto').length} ticket vinti`;
     
-    document.getElementById('kpi-total-lost').textContent = formatEuro(totalLost);
+    document.getElementById('kpi-total-lost').textContent = formatEuro(periodLost);
     document.getElementById('kpi-lost-count').textContent = `${filtered.filter(t => t.status === 'perso').length} ticket persi`;
     
-    // Bilancio Netto colorato dinamicamente
+    // Capitale Attuale / Bilancio Netto colorato dinamicamente
+    const balanceTitleEl = document.getElementById('kpi-balance-title');
     const balanceEl = document.getElementById('kpi-net-balance');
     const balanceIconEl = document.getElementById('kpi-balance-icon');
-    balanceEl.textContent = formatEuro(netBalance);
+    const roiPercentageEl = document.getElementById('kpi-roi-percentage');
     
-    if (netBalance > 0) {
-      balanceEl.className = 'kpi-value text-green';
-      balanceIconEl.className = 'kpi-icon icon-green';
-      balanceIconEl.innerHTML = '<i data-lucide="trending-up"></i>';
-    } else if (netBalance < 0) {
-      balanceEl.className = 'kpi-value text-red';
-      balanceIconEl.className = 'kpi-icon icon-red';
-      balanceIconEl.innerHTML = '<i data-lucide="trending-down"></i>';
+    if (initialCapitalDate) {
+      if (balanceTitleEl) balanceTitleEl.textContent = 'Capitale Attuale';
+      balanceEl.textContent = formatEuro(currentCapital);
+      
+      if (currentCapital > initialCapital) {
+        balanceEl.className = 'kpi-value text-green';
+        balanceIconEl.className = 'kpi-icon icon-green';
+        balanceIconEl.innerHTML = '<i data-lucide="trending-up"></i>';
+      } else if (currentCapital < initialCapital) {
+        balanceEl.className = 'kpi-value text-red';
+        balanceIconEl.className = 'kpi-icon icon-red';
+        balanceIconEl.innerHTML = '<i data-lucide="trending-down"></i>';
+      } else {
+        balanceEl.className = 'kpi-value';
+        balanceIconEl.className = 'kpi-icon';
+        balanceIconEl.innerHTML = '<i data-lucide="dollar-sign"></i>';
+      }
+      
+      const profitSign = periodNetProfit >= 0 ? '+' : '';
+      const profitClass = periodNetProfit >= 0 ? 'text-green' : 'text-red';
+      roiPercentageEl.innerHTML = `Periodo: <span class="${profitClass}">${profitSign}${formatEuro(periodNetProfit)}</span> (ROI: ${periodRoi}%)`;
     } else {
-      balanceEl.className = 'kpi-value';
-      balanceIconEl.className = 'kpi-icon';
-      balanceIconEl.innerHTML = '<i data-lucide="dollar-sign"></i>';
+      if (balanceTitleEl) balanceTitleEl.textContent = 'Bilancio Netto (ROI)';
+      balanceEl.textContent = formatEuro(periodNetProfit);
+      
+      if (periodNetProfit > 0) {
+        balanceEl.className = 'kpi-value text-green';
+        balanceIconEl.className = 'kpi-icon icon-green';
+        balanceIconEl.innerHTML = '<i data-lucide="trending-up"></i>';
+      } else if (periodNetProfit < 0) {
+        balanceEl.className = 'kpi-value text-red';
+        balanceIconEl.className = 'kpi-icon icon-red';
+        balanceIconEl.innerHTML = '<i data-lucide="trending-down"></i>';
+      } else {
+        balanceEl.className = 'kpi-value';
+        balanceIconEl.className = 'kpi-icon';
+        balanceIconEl.innerHTML = '<i data-lucide="dollar-sign"></i>';
+      }
+      
+      roiPercentageEl.textContent = `ROI: ${periodRoi}%`;
     }
-    
-    document.getElementById('kpi-roi-percentage').textContent = `ROI: ${roi}%`;
     document.getElementById('kpi-open-count').textContent = openCount;
     document.getElementById('kpi-open-potential-winnings').textContent = `Vincita Potenziale: ${formatEuro(openPotentialWinnings)}`;
     
@@ -649,6 +760,11 @@ document.addEventListener('DOMContentLoaded', () => {
     sorted.forEach(t => {
       const tr = document.createElement('tr');
       
+      const isPrevious = initialCapitalDate && t.emissionDate < initialCapitalDate;
+      if (isPrevious) {
+        tr.className = 'ticket-row-previous';
+      }
+      
       // Classe badge stato
       let statusClass = 'status-aperto';
       let statusLabel = 'Aperto';
@@ -674,13 +790,21 @@ document.addEventListener('DOMContentLoaded', () => {
         winningsClass = 'text-amber';
       }
       
+      let playedDisplay = formatEuro(amountPlayed);
+      if (isPrevious) {
+        playedDisplay = `
+          <span class="played-previous-strikethrough">${formatEuro(amountPlayed)}</span>
+          <span class="played-previous-label">Precedente</span>
+        `;
+      }
+      
       tr.innerHTML = `
         <td><strong>${escapeHtml(t.agency)}</strong></td>
         <td>${escapeHtml(t.event)}</td>
         <td><span class="badge">${escapeHtml(t.outcomePlayed)}</span></td>
         <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
         <td>${odds.toFixed(2)}</td>
-        <td class="cell-currency">${formatEuro(amountPlayed)}</td>
+        <td class="cell-currency">${playedDisplay}</td>
         <td class="${winningsClass}">${winningsDisplay}</td>
         <td>${formatDateString(t.emissionDate)}</td>
         <td>${formatDateString(t.competenceDate)}</td>
@@ -924,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.error('Errore durante il salvataggio cloud, eseguo fallback locale:', err);
       updateDbStatus('offline');
-      alert('Impossibile salvare sul database cloud. Il ticket è stato salvato temporaneamente in locale.');
+      showToast('Impossibile salvare sul database cloud. Il ticket è stato salvato temporaneamente in locale.', 'warning');
       
       if (id) {
         const index = tickets.findIndex(t => t.id === id);
@@ -989,7 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         console.error('Errore durante la cancellazione cloud, eseguo fallback locale:', err);
         updateDbStatus('offline');
-        alert('Impossibile eliminare dal database cloud. Il ticket è stato rimosso solo localmente.');
+        showToast('Impossibile eliminare dal database cloud. Il ticket è stato rimosso solo localmente.', 'warning');
         tickets = tickets.filter(t => t.id !== ticketToDeleteId);
         saveDataLocal();
       } finally {
@@ -1002,6 +1126,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Helper per l'apertura e la chiusura dei dialog con supporto all'animazione e al click out (light dismiss)
   function openDialog(dialog) {
+    if (!dialog) return;
     dialog.showModal();
     // Innesca l'animazione CSS
     requestAnimationFrame(() => {
@@ -1010,6 +1135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeDialog(dialog) {
+    if (!dialog) return;
     dialog.style.opacity = '0';
     // Aspetta il completamento dell'animazione di chiusura (300ms)
     setTimeout(() => {
@@ -1018,7 +1144,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Fallback per chiudere i dialog cliccando fuori dal contenuto (sul backdrop)
-  [ticketModal, deleteConfirmModal].forEach(dialog => {
+  const genericConfirmModal = document.getElementById('generic-confirm-modal');
+  [ticketModal, deleteConfirmModal, genericConfirmModal].forEach(dialog => {
+    if (!dialog) return;
     if (!('closedBy' in HTMLDialogElement.prototype)) {
       dialog.addEventListener('click', (event) => {
         if (event.target !== dialog) return;
@@ -1038,6 +1166,122 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
+
+  // Sistema di Notifiche Toast Custom
+  function showToast(message, type = 'info', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    let iconName = 'info';
+    if (type === 'success') iconName = 'check-circle';
+    if (type === 'error') iconName = 'alert-triangle';
+    if (type === 'warning') iconName = 'alert-circle';
+
+    toast.innerHTML = `
+      <div class="toast-icon">
+        <i data-lucide="${iconName}"></i>
+      </div>
+      <div class="toast-message">${escapeHtml(message)}</div>
+      <button class="toast-close">
+        <i data-lucide="x"></i>
+      </button>
+    `;
+
+    container.appendChild(toast);
+    
+    // Inizializza icone Lucide nel nuovo elemento toast
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons({
+        attrs: {
+          class: 'lucide'
+        },
+        nameAttr: 'data-lucide',
+        node: toast
+      });
+    }
+
+    // Innesca l'animazione di entrata
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    // Funzione per chiudere il toast
+    const dismiss = () => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.remove();
+      }, 350);
+    };
+
+    // Auto-chiusura
+    const timer = setTimeout(dismiss, duration);
+
+    // Chiusura al click sul pulsante "X"
+    const closeBtn = toast.querySelector('.toast-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        clearTimeout(timer);
+        dismiss();
+      });
+    }
+  }
+
+  // Dialog di Conferma Generica Custom
+  function showConfirm(title, message, confirmBtnText = 'Conferma', confirmBtnClass = 'btn-primary') {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('generic-confirm-modal');
+      const titleEl = document.getElementById('generic-confirm-title');
+      const messageEl = document.getElementById('generic-confirm-message');
+      const confirmBtn = document.getElementById('btn-confirm-generic-confirm');
+      const cancelBtn = document.getElementById('btn-cancel-generic-confirm');
+      const closeBtn = document.getElementById('btn-close-generic-confirm');
+
+      if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn || !closeBtn) {
+        resolve(confirm(message)); // Fallback nativo
+        return;
+      }
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      confirmBtn.textContent = confirmBtnText;
+      
+      // Imposta le classi del bottone di conferma
+      confirmBtn.className = `btn ${confirmBtnClass}`;
+
+      let resolved = false;
+
+      const handleConfirm = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        closeDialog(modal);
+        resolve(true);
+      };
+
+      const handleCancel = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        closeDialog(modal);
+        resolve(false);
+      };
+
+      const cleanup = () => {
+        confirmBtn.removeEventListener('click', handleConfirm);
+        cancelBtn.removeEventListener('click', handleCancel);
+        closeBtn.removeEventListener('click', handleCancel);
+      };
+
+      confirmBtn.addEventListener('click', handleConfirm);
+      cancelBtn.addEventListener('click', handleCancel);
+      closeBtn.addEventListener('click', handleCancel);
+
+      openDialog(modal);
+    });
+  }
 
   // ==========================================================================
   // 9. FUNZIONALITÀ GRAFICI CON CHART.JS
@@ -1073,27 +1317,51 @@ document.addEventListener('DOMContentLoaded', () => {
       const ctxAgency = canvasAgency.getContext('2d');
       if (!ctxProfit || !ctxAgency) return;
 
-      // 1. GRAFICO PROFITTO NETTO SETTIMANALE
+      // Aggiorna titolo del grafico se c'è capitale iniziale attivo
+      const chartTitleEl = document.querySelector('.chart-card h3');
+      if (chartTitleEl) {
+        chartTitleEl.textContent = initialCapitalDate 
+          ? 'Andamento Capitale (€)' 
+          : 'Profitto Netto Cumulativo (€)';
+      }
+
+      // 1. GRAFICO PROFITTO NETTO CUMULATIVO / ANDAMENTO CAPITALE
       // Raggruppa i ticket per settimana basandoci sulla data di emissione
       const weeklyData = {};
       
-      // Ordiniamo tutti i ticket storici per data per visualizzare un asse temporale corretto
-      const allSortedTickets = [...tickets].sort((a, b) => a.emissionDate.localeCompare(b.emissionDate));
+      // Filtra i ticket conclusi ed esclude quelli passati persi/aperti
+      const chartTickets = tickets.filter(t => {
+        if (t.status === 'aperto') return false;
+        if (initialCapitalDate) {
+          if (t.emissionDate >= initialCapitalDate) return true;
+          if (t.status === 'vinto') return true;
+          return false;
+        }
+        return true;
+      });
       
-      allSortedTickets.forEach(t => {
-        // Consideriamo solo i ticket conclusi (Vinto o Perso) per calcolare il profitto effettivo
-        if (t.status === 'aperto') return; 
-        
+      // Ordiniamo tutti i ticket storici per data per visualizzare un asse temporale corretto
+      chartTickets.sort((a, b) => a.emissionDate.localeCompare(b.emissionDate));
+      
+      let runningCapital = initialCapital;
+      chartTickets.forEach(t => {
         const weekLabel = getWeekLabel(t.emissionDate);
-        if (!weeklyData[weekLabel]) {
-          weeklyData[weekLabel] = 0;
+        
+        let change = 0;
+        if (initialCapitalDate && t.emissionDate < initialCapitalDate) {
+          if (t.status === 'vinto') {
+            change = parseFloat(t.actualWinnings) || 0;
+          }
+        } else {
+          if (t.status === 'vinto') {
+            change = (parseFloat(t.actualWinnings) || 0) - (parseFloat(t.amountPlayed) || 0);
+          } else if (t.status === 'perso') {
+            change = -(parseFloat(t.amountPlayed) || 0);
+          }
         }
         
-        if (t.status === 'vinto') {
-          weeklyData[weekLabel] += (t.actualWinnings - t.amountPlayed);
-        } else {
-          weeklyData[weekLabel] -= t.amountPlayed;
-        }
+        runningCapital += change;
+        weeklyData[weekLabel] = runningCapital;
       });
 
       const labelsNetProfit = Object.keys(weeklyData);
@@ -1106,7 +1374,7 @@ document.addEventListener('DOMContentLoaded', () => {
         data: {
           labels: labelsNetProfit,
           datasets: [{
-            label: 'Profitto (€)',
+            label: initialCapitalDate ? 'Capitale (€)' : 'Profitto (€)',
             data: dataNetProfit,
             borderColor: '#6366f1',
             backgroundColor: 'rgba(99, 102, 241, 0.1)',
@@ -1151,6 +1419,9 @@ document.addEventListener('DOMContentLoaded', () => {
       // 2. GRAFICO VOLUME GIOCATO PER AGENZIA
       const agencyData = {};
       filteredTickets.forEach(t => {
+        const isPrevious = initialCapitalDate && t.emissionDate < initialCapitalDate;
+        if (isPrevious) return; // Salta ticket precedenti (giocato non pagato da questa banca)
+
         if (!agencyData[t.agency]) {
           agencyData[t.agency] = 0;
         }
@@ -1222,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = getFilteredTickets();
     
     if (filtered.length === 0) {
-      alert('Nessun ticket da esportare con i filtri correnti.');
+      showToast('Nessun ticket da esportare con i filtri correnti.', 'warning');
       return;
     }
 
@@ -1245,9 +1516,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Mappatura delle righe dati
     const excelRows = sorted.map(t => {
-      const net = t.status === 'vinto' 
-        ? parseFloat((t.actualWinnings - t.amountPlayed).toFixed(2))
-        : (t.status === 'perso' ? -t.amountPlayed : 0);
+      const isPrevious = initialCapitalDate && t.emissionDate < initialCapitalDate;
+      
+      let amountPlayedVal = t.amountPlayed;
+      let net = 0;
+      
+      if (isPrevious) {
+        amountPlayedVal = 0; // Giocato non pagato da questa banca
+        net = t.status === 'vinto' ? t.actualWinnings : 0;
+      } else {
+        net = t.status === 'vinto' 
+          ? parseFloat((t.actualWinnings - t.amountPlayed).toFixed(2))
+          : (t.status === 'perso' ? -t.amountPlayed : 0);
+      }
       
       const winnings = t.status === 'vinto' ? t.actualWinnings : 0;
       
@@ -1255,13 +1536,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (t.status === 'vinto') stateLabel = 'Vinto';
       if (t.status === 'perso') stateLabel = 'Perso';
 
+      const eventLabel = isPrevious ? `[PRECEDENTE] ${t.event}` : t.event;
+
       return [
         t.agency,
-        t.event,
+        eventLabel,
         t.outcomePlayed,
         stateLabel,
         t.odds,
-        t.amountPlayed,
+        amountPlayedVal,
         winnings,
         net,
         formatDateString(t.emissionDate),
@@ -1269,21 +1552,41 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
     });
 
-    // Riga temporanea per i totali alla fine dei dati per riservare lo spazio ed estendere il range !ref
-    const totalsTempRow = ['TOTALE', '', '', '', '', 0, 0, 0, '', ''];
-    const allData = [excelHeaders, ...excelRows, totalsTempRow];
+    // Costruiamo tutte le righe includendo il capitale iniziale in cima, se presente
+    const allData = [excelHeaders];
+    
+    if (initialCapitalDate && initialCapital > 0) {
+      const capitalRow = [
+        '-',
+        '[CAPITALE INIZIALE]',
+        '-',
+        '-',
+        '',
+        0,
+        0,
+        initialCapital,
+        formatDateString(initialCapitalDate),
+        '-'
+      ];
+      allData.push(capitalRow);
+    }
+    
+    allData.push(...excelRows);
 
-    // Creiamo un nuovo foglio di lavoro (il range !ref includerà automaticamente la riga dei totali)
+    // Riga temporanea per i totali
+    const totalsTempRow = ['TOTALE', '', '', '', '', 0, 0, 0, '', ''];
+    allData.push(totalsTempRow);
+
+    // Creiamo un nuovo foglio di lavoro
     const ws = XLSX.utils.aoa_to_sheet(allData);
 
-    const dataRowCount = excelRows.length + 1; // Indice dell'ultima riga di dati (es. se c'è 1 ticket, è la riga 2)
-    const totalsRowIndex = allData.length;     // Indice della riga dei totali (es. riga 3)
+    const totalsRowIndex = allData.length;       // Indice della riga dei totali (es. riga 4)
+    const lastDataRowIndex = totalsRowIndex - 1; // Indice dell'ultima riga di dati (es. riga 3)
     
-    // Inseriamo le formule di somma reali per Giocato (Colonna F), Vinto (Colonna G) e Netto (Colonna H)
-    // Gli indici delle righe dati in Excel vanno da 2 (riga 2) a dataRowCount (riga dataRowCount)
-    ws[`F${totalsRowIndex}`] = { t: 'n', f: `SUM(F2:F${dataRowCount})` };
-    ws[`G${totalsRowIndex}`] = { t: 'n', f: `SUM(G2:G${dataRowCount})` };
-    ws[`H${totalsRowIndex}`] = { t: 'n', f: `SUM(H2:H${dataRowCount})` };
+    // Inseriamo le formule di somma reali
+    ws[`F${totalsRowIndex}`] = { t: 'n', f: `SUM(F2:F${lastDataRowIndex})` };
+    ws[`G${totalsRowIndex}`] = { t: 'n', f: `SUM(G2:G${lastDataRowIndex})` };
+    ws[`H${totalsRowIndex}`] = { t: 'n', f: `SUM(H2:H${lastDataRowIndex})` };
 
     // Impostiamo la formattazione dei numeri per le colonne di valuta e decimali
     // F (Giocato), G (Vinto), H (Netto) e E (Quota)
@@ -1398,7 +1701,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const id = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name');
         
-        if (confirm(`Sei sicuro di voler eliminare l'agenzia "${name}"? Questa azione non influirà sui ticket esistenti.`)) {
+        const isConfirmed = await showConfirm(
+          'Elimina Agenzia',
+          `Sei sicuro di voler eliminare l'agenzia "${name}"? Questa azione non influirà sui ticket esistenti.`,
+          'Elimina',
+          'btn-danger'
+        );
+        if (isConfirmed) {
           showLoadingState();
           await deleteAgency(id, name);
           renderAgenciesPage();
@@ -1423,7 +1732,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Verifica duplicati (case-insensitive)
       const exists = agenciesList.some(a => a.name.toLowerCase() === name.toLowerCase());
       if (exists) {
-        alert('Questa agenzia esiste già.');
+        showToast('Questa agenzia esiste già.', 'warning');
         return;
       }
 
