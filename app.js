@@ -52,10 +52,30 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. FUNZIONI DI PERSISTENZA, CARICAMENTO E BACKUP
   // ==========================================================================
   
-  // URL del Backend (su localhost o Render)
-  const API_URL = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  // URL del Backend (su localhost, file:/// o Render)
+  const API_URL = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '' || location.protocol === 'file:'
     ? 'http://localhost:3000'
     : 'https://ticktracker.onrender.com';
+
+  // Wrapper di fetch locale con timeout per evitare connessioni sospese (es. server offline o standby)
+  const nativeFetch = window.fetch;
+  const fetch = async (resource, options = {}) => {
+    const { timeout = 4000 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await nativeFetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  };
 
   function showLoadingState() {
     const tbody = document.getElementById('tickets-table-body');

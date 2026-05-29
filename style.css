@@ -157,8 +157,8 @@ body {
 }
 
 .db-status-dot.offline {
-  background-color: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
+  background-color: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
 }
 
 .db-status-dot.connecting {
