@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     agencyVolume: null
   };
   let ticketToDeleteId = null;
+  let selectedTicketIds = new Set();
   let chartUpdateTimeout = null;
 
   // Gestione Capitale Iniziale
@@ -532,6 +533,25 @@ document.addEventListener('DOMContentLoaded', () => {
     renderApp();
   });
 
+  // Gestione della selezione di tutti i ticket
+  const checkAllTickets = document.getElementById('check-all-tickets');
+  if (checkAllTickets) {
+    checkAllTickets.addEventListener('change', () => {
+      const isChecked = checkAllTickets.checked;
+      const visibleCheckboxes = document.querySelectorAll('.ticket-checkbox');
+      visibleCheckboxes.forEach(cb => {
+        const id = cb.getAttribute('data-id');
+        cb.checked = isChecked;
+        if (isChecked) {
+          selectedTicketIds.add(id);
+        } else {
+          selectedTicketIds.delete(id);
+        }
+      });
+      updateBulkDeleteButton();
+    });
+  }
+
   // Funzione per filtrare i ticket in base allo stato dei filtri correnti
   function getFilteredTickets() {
     const searchVal = filterSearch.value.toLowerCase().trim();
@@ -631,6 +651,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // 6. CALCOLO E RENDERING DELLA DASHBOARD
   // ==========================================================================
   function renderApp() {
+    // Reset dello stato di multi-selezione
+    selectedTicketIds.clear();
+    const checkAllTickets = document.getElementById('check-all-tickets');
+    if (checkAllTickets) checkAllTickets.checked = false;
+    updateBulkDeleteButton();
+
     const filtered = getFilteredTickets();
     
     // Aggiorna i selettori filtri (solo le agenzie, se necessario, senza resettare la selezione)
@@ -778,6 +804,19 @@ document.addEventListener('DOMContentLoaded', () => {
     return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(amount);
   }
  
+  function updateBulkDeleteButton() {
+    const btnDeleteSelected = document.getElementById('btn-delete-selected');
+    const selectedCountSpan = document.getElementById('selected-count');
+    if (!btnDeleteSelected || !selectedCountSpan) return;
+    
+    if (selectedTicketIds.size > 0) {
+      btnDeleteSelected.classList.remove('hidden');
+      selectedCountSpan.textContent = selectedTicketIds.size;
+    } else {
+      btnDeleteSelected.classList.add('hidden');
+    }
+  }
+ 
   function renderTable(filteredTickets) {
     const tbody = document.getElementById('tickets-table-body');
     tbody.innerHTML = '';
@@ -785,7 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (filteredTickets.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="10" class="text-center py-5 text-muted">
+          <td colspan="11" class="text-center py-5 text-muted">
             Nessun ticket soddisfa i filtri selezionati.
           </td>
         </tr>
@@ -837,7 +876,12 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
       }
       
+      const isChecked = selectedTicketIds.has(t.id);
+      
       tr.innerHTML = `
+        <td style="padding: 14px 10px 14px 20px;">
+          <input type="checkbox" class="ticket-checkbox" data-id="${t.id}" ${isChecked ? 'checked' : ''}>
+        </td>
         <td><strong>${escapeHtml(t.agency)}</strong></td>
         <td>${escapeHtml(t.event)}</td>
         <td><span class="badge">${escapeHtml(t.outcomePlayed)}</span></td>
@@ -859,6 +903,27 @@ document.addEventListener('DOMContentLoaded', () => {
         </td>
       `;
       tbody.appendChild(tr);
+    });
+
+    // Aggiungi event listeners per i checkbox individuali
+    tbody.querySelectorAll('.ticket-checkbox').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = cb.getAttribute('data-id');
+        if (cb.checked) {
+          selectedTicketIds.add(id);
+        } else {
+          selectedTicketIds.delete(id);
+        }
+        updateBulkDeleteButton();
+        
+        // Gestisci lo stato del checkbox "seleziona tutti"
+        const checkAllTickets = document.getElementById('check-all-tickets');
+        if (checkAllTickets) {
+          const visibleCheckboxes = Array.from(tbody.querySelectorAll('.ticket-checkbox'));
+          const allChecked = visibleCheckboxes.length > 0 && visibleCheckboxes.every(c => c.checked);
+          checkAllTickets.checked = allChecked;
+        }
+      });
     });
 
     // Aggiungi event listeners per i pulsanti modifica ed elimina
@@ -1162,6 +1227,58 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // Gestione Eliminazione Massiva (Bulk)
+  const btnDeleteSelected = document.getElementById('btn-delete-selected');
+  if (btnDeleteSelected) {
+    btnDeleteSelected.addEventListener('click', async () => {
+      const count = selectedTicketIds.size;
+      if (count === 0) return;
+      
+      const confirmMsg = `Sei sicuro di voler eliminare i ${count} ticket selezionati? Questa azione è irreversibile.`;
+      const isConfirmed = await showConfirm('Conferma Eliminazione Massiva', confirmMsg, 'Elimina', 'btn-danger');
+      
+      if (isConfirmed) {
+        try {
+          showLoadingState();
+          updateDbStatus('connecting');
+          
+          const idsArray = Array.from(selectedTicketIds);
+          // Dividiamo in ID reali e ID locali (iniziano con local-)
+          const realIds = idsArray.filter(id => !id.startsWith('local-'));
+          
+          if (realIds.length > 0) {
+            const response = await fetch(`${API_URL}/api/tickets/delete-bulk`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ ids: realIds })
+            });
+            if (!response.ok) throw new Error('Cancellazione massiva sul cloud fallita');
+          }
+          
+          // Rimuoviamo da locale tutti gli ID (sia cloud che locali)
+          tickets = tickets.filter(t => !selectedTicketIds.has(t.id));
+          saveDataLocal();
+          updateDbStatus('online');
+          showToast(`${count} ticket eliminati con successo!`, 'success');
+        } catch (error) {
+          console.error('Errore durante eliminazione massiva, procedo in locale:', error);
+          tickets = tickets.filter(t => !selectedTicketIds.has(t.id));
+          saveDataLocal();
+          updateDbStatus('offline');
+          showToast(`${count} ticket eliminati localmente (Offline). Errore di sincronizzazione.`, 'warning');
+        } finally {
+          selectedTicketIds.clear();
+          const checkAllTickets = document.getElementById('check-all-tickets');
+          if (checkAllTickets) checkAllTickets.checked = false;
+          updateBulkDeleteButton();
+          renderApp();
+        }
+      }
+    });
+  }
 
   // Helper per l'apertura e la chiusura dei dialog con supporto all'animazione e al click out (light dismiss)
   function openDialog(dialog) {

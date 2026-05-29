@@ -271,13 +271,19 @@
           <section class="table-container bg-glass" id="section-tickets">
             <div class="section-header">
               <h2>Dettaglio Ticket</h2>
-              <span class="badge" id="filtered-tickets-count">Mostrati 0 ticket</span>
+              <div class="section-header-actions" style="display: flex; align-items: center; gap: 10px;">
+                <button id="btn-delete-selected" class="btn btn-danger btn-sm hidden" style="padding: 6px 12px; font-size: 11px;">
+                  <i data-lucide="trash-2"></i> Elimina Selezionati (<span id="selected-count">0</span>)
+                </button>
+                <span class="badge" id="filtered-tickets-count">Mostrati 0 ticket</span>
+              </div>
             </div>
             
             <div class="table-responsive">
               <table class="tickets-table">
                 <thead>
                   <tr>
+                    <th style="width: 40px; padding: 14px 10px 14px 20px;"><input type="checkbox" id="check-all-tickets"></th>
                     <th>Agenzia</th>
                     <th>Evento</th>
                     <th>Esito Giocato</th>
@@ -482,7 +488,7 @@
       </div>
       <div class="modal-body py-4">
         <p>Sei sicuro di voler eliminare questo ticket? Questa azione è irreversibile.</p>
-        <div class="ticket-summary-delete mt-3 text-muted" id="delete-ticket-summary">
+        <div class="ticket-summary-delete mt-3" id="delete-ticket-summary">
           <!-- Popolato dinamicamente da app.js -->
         </div>
       </div>

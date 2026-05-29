@@ -167,6 +167,27 @@ app.delete('/api/tickets/:id', async (req, res) => {
   }
 });
 
+// 4.1 DELETE BULK TICKETS
+app.post('/api/tickets/delete-bulk', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({ error: 'Il body deve contenere un array di id' });
+    }
+    const { error } = await supabase
+      .from('tickets')
+      .delete()
+      .in('id', ids);
+
+    if (error) throw error;
+
+    res.json({ message: 'Ticket eliminati con successo', ids });
+  } catch (error) {
+    console.error('Errore nella cancellazione massiva dei ticket:', error.message);
+    res.status(500).json({ error: 'Errore durante l\'eliminazione massiva dei ticket' });
+  }
+});
+
 // 5. DELETE ALL TICKETS (Reset Database)
 app.delete('/api/tickets-all/reset', async (req, res) => {
   try {
